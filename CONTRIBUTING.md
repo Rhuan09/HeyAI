@@ -13,8 +13,15 @@ dotnet run --project src/HeyAI.Server -- doctor     # verify the STA dispatcher
 
 ## Branching
 
-`main` is protected and always releasable. Never commit to it directly — every change
-goes through a pull request, including your own.
+`main` is always releasable. Never commit to it directly — every change goes through a
+pull request, including your own.
+
+Whether GitHub *enforces* that is a repository setting, not something this file can
+guarantee. To require PRs and a passing CI check before anything lands on `main`:
+
+```bash
+gh api -X POST repos/:owner/:repo/rulesets --input .github/rulesets/main.json
+```
 
 Branch names are `<type>/<short-kebab-description>`:
 
