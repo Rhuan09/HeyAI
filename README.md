@@ -18,14 +18,19 @@ Phase 1. Media module working end to end; Window and Vision next. See
 
 ## Install
 
+There is no packaged release yet (see [Distribution](docs/ARCHITECTURE.md#distribution)).
+Build from source:
+
 ```bash
-dotnet tool install -g HeyAI
+git clone https://github.com/Rhuan09/HeyAI
+cd HeyAI
+dotnet build -c Release
 ```
 
-Then register it with your client:
+Then point your MCP client at the built executable:
 
 ```bash
-claude mcp add heyai -- heyai
+claude mcp add heyai -- <repo>/src/HeyAI.Server/bin/Release/net10.0-windows10.0.26100.0/heyai.exe
 ```
 
 ## Tools
@@ -42,13 +47,13 @@ New tools ship **disabled**. Enable them in `%LOCALAPPDATA%\HeyAI\config.json`.
 ## Try it without an agent
 
 ```bash
-heyai doctor                  # check the STA dispatcher and state directory
-heyai list                    # registered tools and whether they are enabled
-heyai test media_get_status
-heyai test audio_set_volume '{"target":"app","app":"firefox","level":0.3}'
+heyai.exe doctor              # check the STA dispatcher and state directory
+heyai.exe list                # registered tools and whether they are enabled
+heyai.exe test media_get_status
+heyai.exe test audio_set_volume '{"target":"app","app":"firefox","level":0.3}'
 ```
 
-`heyai test` runs the full policy and audit pipeline, so what you see is what an agent
+`heyai.exe test` runs the full policy and audit pipeline, so what you see is what an agent
 would get.
 
 ## Security

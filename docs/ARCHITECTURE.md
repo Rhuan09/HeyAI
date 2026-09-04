@@ -28,7 +28,7 @@ app, as a separate project.
 
 ### Unpackaged, not MSIX
 
-Unpackaged means `dotnet tool install -g HeyAI` and no installer. The cost is that some
+Unpackaged means no installer and no identity ceremony. The cost is that some
 capabilities are gated behind package identity:
 
 | Capability | Unpackaged status |
@@ -41,8 +41,40 @@ capabilities are gated behind package identity:
 | Toast notifications | Needs an AUMID + Start Menu shortcut + COM activator, or `Microsoft.Windows.AppNotifications` |
 | Radio toggle (Wi-Fi/Bluetooth) | `Radio.RequestAccessAsync` generally fails — **cut from the roadmap** |
 
-Distribution as a global tool also sidesteps SmartScreen and AV heuristics, which an
-unsigned .exe that enumerates windows and captures screens would trip hard.
+## Distribution
+
+**Unresolved, and it is the next architectural decision.**
+
+The original plan was `dotnet tool install -g HeyAI`, which does not work: `PackAsTool`
+rejects any `TargetPlatformIdentifier` (`NETSDK1146`), and this project needs
+`net10.0-windows10.0.26100.0` to reference the WinRT modules. Splitting a `net10.0` tool
+project off does not recover it either, because a platform-agnostic project cannot
+reference a windows-TFM one. Global tools are simply not available to WinRT projects.
+
+That removes the answer to a problem that has not gone away: an unsigned executable which
+enumerates windows and captures screens trips SmartScreen and AV heuristics hard, and that
+kills adoption before the first tool call.
+
+The two remaining routes:
+
+| | Unpackaged + GitHub Releases | MSIX + Microsoft Store |
+| --- | --- | --- |
+| Install | Download a zip, unblock it | Store, or `winget` |
+| SmartScreen | Trips it until reputation accrues | Not applicable |
+| Signing | Needs a paid cert to avoid the above | Store signs for you |
+| Package identity | No | Yes |
+| Toasts | Needs AUMID + shortcut + COM activator | Works |
+| Radio toggle | Fails | May work |
+| Cost | Cert (~$200/yr) or live with the warning | Individual dev account, one-off |
+| Friction | Low for developers | Store review on every release |
+
+MSIX is the stronger answer than this document originally assumed: it solves signing and
+identity together, and identity is what gates Phase 4's toast-based confirmation prompts.
+The counterweight is that Store review on every release is real friction for an
+early-stage project, and MSIX complicates the "just clone and run" contributor path.
+
+Likely resolution: unpackaged zip from GitHub Releases for developers now, MSIX for the
+tray app when Phase 4 needs identity anyway. Decide before advertising the project.
 
 ### Hand-rolled JSON-RPC
 
