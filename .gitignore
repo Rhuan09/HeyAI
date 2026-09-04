@@ -1,0 +1,11 @@
+bin/
+obj/
+*.user
+.vs/
+artifacts/
+TestResults/
+
+# Local agent working guide. Kept out of the repo deliberately; the rules that
+# contributors need live in CONTRIBUTING.md and docs/ARCHITECTURE.md.
+CLAUDE.md
+.claude/

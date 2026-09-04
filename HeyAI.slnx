@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HeyAI.Core/HeyAI.Core.csproj" />
+    <Project Path="src/HeyAI.Modules.Media/HeyAI.Modules.Media.csproj" />
+    <Project Path="src/HeyAI.Server/HeyAI.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HeyAI.Tests/HeyAI.Tests.csproj" />
+  </Folder>
+</Solution>

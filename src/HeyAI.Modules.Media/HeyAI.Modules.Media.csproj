@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>HeyAI.Modules.Media</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HeyAI.Core\HeyAI.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <!-- .NET 10 is the current LTS. .NET 9 was STS and went out of support in 2026-05. -->
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <!-- Lowest Windows build we run on. Guard newer APIs with ApiInformation / IsSupported. -->
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- We do NOT reference Microsoft.WindowsAppSDK here on purpose. A headless stdio
+         server only needs the CsWinRT projection that the windows TFM already provides.
+         See docs/ARCHITECTURE.md "Why no Windows App SDK". -->
+  </PropertyGroup>
+</Project>

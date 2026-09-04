@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>HeyAI.Server</RootNamespace>
+    <AssemblyName>heyai</AssemblyName>
+    <!-- Ships as a global tool: `dotnet tool install -g HeyAI`. This sidesteps
+         SmartScreen/AV friction that an unsigned standalone .exe would hit. -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>heyai</ToolCommandName>
+    <PackageId>HeyAI</PackageId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HeyAI.Core\HeyAI.Core.csproj" />
+    <ProjectReference Include="..\HeyAI.Modules.Media\HeyAI.Modules.Media.csproj" />
+  </ItemGroup>
+</Project>
