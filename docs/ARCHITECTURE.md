@@ -26,10 +26,13 @@ app, as a separate project.
 
 .NET 9 was STS and left support in May 2026. 10 is the current LTS.
 
-### Unpackaged, not MSIX
+### MSIX, with an unpackaged path that still works
 
-Unpackaged means no installer and no identity ceremony. The cost is that some
-capabilities are gated behind package identity:
+Shipping is MSIX. Building from source is not, and never will be, so every capability must
+degrade rather than throw when `PackageIdentity.IsPackaged` is false — that is the
+contributor's daily path.
+
+What identity actually buys:
 
 | Capability | Unpackaged status |
 | --- | --- |
@@ -39,54 +42,53 @@ capabilities are gated behind package identity:
 | `Windows.Media.Ocr` | Works |
 | `Windows.Graphics.Capture` | Works for HWND/monitor capture via `IGraphicsCaptureItemInterop`; the *picker* needs identity |
 | Toast notifications | Needs an AUMID + Start Menu shortcut + COM activator, or `Microsoft.Windows.AppNotifications` |
-| Radio toggle (Wi-Fi/Bluetooth) | `Radio.RequestAccessAsync` generally fails — **cut from the roadmap** |
+| Radio toggle (Wi-Fi/Bluetooth) | `Radio.RequestAccessAsync` generally fails — still **cut from the roadmap** |
 
 ## Distribution
 
-**Unresolved, and it is the next architectural decision.**
+**Decided: MSIX.**
 
-The original plan was `dotnet tool install -g HeyAI`, which does not work: `PackAsTool`
-rejects any `TargetPlatformIdentifier` (`NETSDK1146`), and this project needs
+The original plan was `dotnet tool install -g HeyAI`, which does not work. `PackAsTool`
+rejects any `TargetPlatformIdentifier` (`NETSDK1146`), and the server needs
 `net10.0-windows10.0.26100.0` to reference the WinRT modules. Splitting a `net10.0` tool
 project off does not recover it either, because a platform-agnostic project cannot
-reference a windows-TFM one. Global tools are simply not available to WinRT projects.
+reference a windows-TFM one. Global tools are not available to WinRT projects at all.
 
-That removes the answer to a problem that has not gone away: an unsigned executable which
-enumerates windows and captures screens trips SmartScreen and AV heuristics hard, and that
-kills adoption before the first tool call.
+That left unpackaged-plus-GitHub-Releases against MSIX. MSIX wins because one mechanism
+answers three problems:
 
-The two remaining routes:
+- **Signing.** An unsigned executable that enumerates windows and captures screens trips
+  SmartScreen and AV heuristics hard. Store distribution signs for us; the alternative is
+  roughly $200/yr for a certificate.
+- **Identity.** Toasts, and therefore the Phase 4 tray confirmation prompts, require it.
+  Without identity that path costs an AUMID, a Start Menu shortcut and a COM activator.
+- **Install.** Store or `winget`, instead of "download a zip and unblock it".
 
-| | Unpackaged + GitHub Releases | MSIX + Microsoft Store |
-| --- | --- | --- |
-| Install | Download a zip, unblock it | Store, or `winget` |
-| SmartScreen | Trips it until reputation accrues | Not applicable |
-| Signing | Needs a paid cert to avoid the above | Store signs for you |
-| Package identity | No | Yes |
-| Toasts | Needs AUMID + shortcut + COM activator | Works |
-| Radio toggle | Fails | May work |
-| Cost | Cert (~$200/yr) or live with the warning | Individual dev account, one-off |
-| Friction | Low for developers | Store review on every release |
+The costs are real: Store review on every release, and a packaging step contributors do
+not need for local work. Hence the unpackaged path stays first-class.
 
-MSIX is the stronger answer than this document originally assumed: it solves signing and
-identity together, and identity is what gates Phase 4's toast-based confirmation prompts.
-The counterweight is that Store review on every release is real friction for an
-early-stage project, and MSIX complicates the "just clone and run" contributor path.
+### The assumption that had to be checked
 
-Likely resolution: unpackaged zip from GitHub Releases for developers now, MSIX for the
-tray app when Phase 4 needs identity anyway. Decide before advertising the project.
+MCP requires the client to spawn the server and pipe stdin/stdout. A packaged app is
+launched through an app execution alias shim rather than as a plain executable. If pipes
+or console handles did not survive that shim, MSIX would have been unusable regardless of
+its other merits — and the failure would only have surfaced after a packaging pipeline
+already existed.
 
-### Hand-rolled JSON-RPC
+Verified against a loose-registered dev-mode package before committing to the decision:
 
-The transport is one file. Every call must pass through `ToolInvoker` for policy and
-audit, and an SDK's attribute-based tool registration would fight that. Revisit if HeyAI
-needs sampling or elicitation.
+| Check | Result |
+| --- | --- |
+| `GetCurrentPackageFullName` via the alias | packaged — the shim genuinely confers identity |
+| JSON-RPC over piped stdin/stdout | intact; `initialize` and `tools/call` both round-trip |
+| STA DispatcherQueue thread | comes up STA inside the package |
+| Untrusted-content fencing | preserved through the transport |
 
-### Hand-rolled Core Audio interop
+Note that a shell which resolves the alias reparse point itself (Git Bash does) will
+execute the target binary directly and report *unpackaged*. Test activation from
+PowerShell or cmd, or the result is meaningless.
 
-GSMTC has no volume concept; master and per-app volume are MMDevice/AudioSession COM. Four
-interfaces, so `[GeneratedComInterface]` beats making NAudio the project's only non-SDK
-runtime dependency.
+`heyai doctor` reports identity, so this stays observable rather than becoming folklore.
 
 ## Layout
 
@@ -154,7 +156,7 @@ nobody can review a PR for.
 | 1 | Core + Media slice, stdio transport, CLI | done |
 | 2 | `HeyAI.Modules.Window` (User32, UI Automation) | next — demoable, low risk |
 | 3 | `HeyAI.Modules.Vision` (native OCR + Graphics.Capture) | the differentiator |
-| 4 | Tray app: confirmation prompts, live audit view | unblocks `RequireConfirmation` |
+| 4 | MSIX packaging + tray app: confirmation prompts, live audit view | packaging lands here, since identity is what toasts need |
 | 5 | `HeyAI.Modules.Shell` | last; it is the dangerous one |
 
 Vision is the moat — `Windows.Media.Ocr` is fast, offline and already installed, against a

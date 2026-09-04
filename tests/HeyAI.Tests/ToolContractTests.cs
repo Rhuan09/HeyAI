@@ -96,3 +96,25 @@ public sealed class ToolContractTests
         return new ToolInvoker(BuildRegistry(), new PolicyEngine(config, taint), audit, taint);
     }
 }
+
+/// <summary>
+/// Identity detection must be safe to call on the unpackaged path, which is what CI and
+/// every contributor's local build run on.
+/// </summary>
+public sealed class PackageIdentityTests
+{
+    [Fact]
+    public void Reports_unpackaged_without_throwing_when_there_is_no_package()
+    {
+        // The test host is never packaged, so this pins the degrade-don't-throw contract.
+        Assert.False(PackageIdentity.IsPackaged);
+        Assert.Null(PackageIdentity.FullName);
+    }
+
+    [Fact]
+    public void Repeated_reads_are_consistent()
+    {
+        Assert.Equal(PackageIdentity.IsPackaged, PackageIdentity.IsPackaged);
+        Assert.Equal(PackageIdentity.FullName, PackageIdentity.FullName);
+    }
+}

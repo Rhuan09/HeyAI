@@ -112,6 +112,9 @@ internal static class Program
         var ok = true;
 
         log.WriteLine($"state dir : {HeyAIPaths.Root}");
+        log.WriteLine(PackageIdentity.IsPackaged
+            ? $"identity  : packaged ({PackageIdentity.FullName})"
+            : "identity  : unpackaged (toasts and the tray need MSIX identity)");
         log.WriteLine($"config    : {(File.Exists(HeyAIPaths.ConfigFile) ? "present" : "missing")}");
 
         await using var dispatcher = new StaWinRtDispatcher();
