@@ -3,11 +3,11 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>HeyAI.Server</RootNamespace>
     <AssemblyName>heyai</AssemblyName>
-    <!-- Ships as a global tool: `dotnet tool install -g HeyAI`. This sidesteps
-         SmartScreen/AV friction that an unsigned standalone .exe would hit. -->
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>heyai</ToolCommandName>
-    <PackageId>HeyAI</PackageId>
+    <!-- NOT PackAsTool. NETSDK1146: PackAsTool rejects any TargetPlatformIdentifier,
+         and this project needs net10.0-windows10.0.26100.0 to reference the WinRT
+         modules. A net10.0 tool project cannot reference a windows-TFM project either,
+         so there is no split that recovers it. Distribution is unresolved; see
+         docs/ARCHITECTURE.md "Distribution". -->
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\HeyAI.Core\HeyAI.Core.csproj" />
