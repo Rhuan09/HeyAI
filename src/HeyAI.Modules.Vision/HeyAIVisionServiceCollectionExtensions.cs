@@ -26,6 +26,7 @@ public static class HeyAIVisionServiceCollectionExtensions
         services.TryAddEnumerable(
         [
             ServiceDescriptor.Singleton<IHeyAITool, OcrReadTextTool>(),
+            ServiceDescriptor.Singleton<IHeyAITool, ScreenCaptureTool>(),
         ]);
 
         return services;
