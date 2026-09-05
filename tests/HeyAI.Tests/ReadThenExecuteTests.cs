@@ -1,6 +1,7 @@
 using System.Text.Json;
 using HeyAI.Core;
 using HeyAI.Core.Audit;
+using HeyAI.Core.Confirmation;
 using HeyAI.Core.Security;
 using HeyAI.Core.Tools;
 using Xunit;
@@ -55,7 +56,7 @@ public sealed class ReadThenExecuteTests
 
         var taint = new TaintTracker();
         var audit = new InMemoryAuditLog();
-        return (new ToolInvoker(registry, new PolicyEngine(config, taint), audit, taint), audit);
+        return (new ToolInvoker(registry, new PolicyEngine(config, taint), audit, taint, new DenyingConfirmationPrompt()), audit);
     }
 
     private static Task<ToolResult> Call(ToolInvoker invoker, string tool) =>
@@ -124,8 +125,7 @@ public sealed class ReadThenExecuteTests
 
         var taint = new TaintTracker();
         var config = new HeyAIConfig { EnabledTools = ["fake_ocr", "fake_pause"] };
-        var invoker = new ToolInvoker(
-            registry, new PolicyEngine(config, taint), new InMemoryAuditLog(), taint);
+        var invoker = new ToolInvoker(registry, new PolicyEngine(config, taint), new InMemoryAuditLog(), taint, new DenyingConfirmationPrompt());
 
         await Call(invoker, "fake_ocr");
 

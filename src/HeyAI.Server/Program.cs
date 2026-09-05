@@ -1,10 +1,12 @@
 using System.Text;
 using System.Text.Json;
 using HeyAI.Core;
+using HeyAI.Core.Confirmation;
 using HeyAI.Core.Security;
 using HeyAI.Core.Threading;
 using HeyAI.Core.Tools;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace HeyAI.Server;
 
@@ -22,7 +24,15 @@ internal static class Program
 
         // The composition root. Each module owns its own registrations, so adding one is
         // a single line here rather than an edit inside this method's body.
-        var services = new ServiceCollection()
+        var services = new ServiceCollection();
+
+        // Replace rather than register-before: TryAddSingleton inside AddHeyAICore would
+        // make this depend on call order, and a silently-ignored prompt registration
+        // means Critical actions are refused with no clue why.
+        services.Replace(ServiceDescriptor.Singleton<IConfirmationPrompt>(
+            _ => new NamedPipeConfirmationPrompt()));
+
+        services
             .AddHeyAICore()
             .AddHeyAIMedia()
             .AddHeyAIWindow()

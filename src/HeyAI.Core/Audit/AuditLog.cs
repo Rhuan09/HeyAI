@@ -25,6 +25,13 @@ public sealed record AuditEntry
     public bool? Failed { get; init; }
     public string? ErrorCode { get; init; }
     public bool? ProducedTaintedOutput { get; init; }
+
+    /// <summary>
+    /// True when a person approved this at a prompt, false when they refused, null when
+    /// policy decided without asking. The distinction is the point of the log: "a human
+    /// said yes" and "the rules said yes" are different claims about the same action.
+    /// </summary>
+    public bool? ConfirmedByHuman { get; init; }
     public string? Client { get; init; }
 }
 

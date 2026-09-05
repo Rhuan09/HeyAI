@@ -1,6 +1,7 @@
 using System.Text.Json;
 using HeyAI.Core;
 using HeyAI.Core.Audit;
+using HeyAI.Core.Confirmation;
 using HeyAI.Core.Security;
 using HeyAI.Core.Tools;
 using HeyAI.Server.Mcp;
@@ -40,8 +41,7 @@ public sealed class McpTransportTests
 
         var config = new HeyAIConfig { EnabledTools = ["slow_tool", "fast_tool"] };
         var taint = new TaintTracker();
-        var invoker = new ToolInvoker(
-            registry, new PolicyEngine(config, taint), new InMemoryAuditLog(), taint);
+        var invoker = new ToolInvoker(registry, new PolicyEngine(config, taint), new InMemoryAuditLog(), taint, new DenyingConfirmationPrompt());
 
         return new McpServer(registry, invoker, TextWriter.Null);
     }
