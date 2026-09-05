@@ -36,6 +36,7 @@ public sealed class HeyAIConfig
             "media_control",
             "audio_get_devices",
             "audio_set_volume",
+            "window_list_open",
         ],
     };
 
