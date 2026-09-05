@@ -13,5 +13,6 @@
     <ProjectReference Include="..\..\src\HeyAI.Core\HeyAI.Core.csproj" />
     <ProjectReference Include="..\..\src\HeyAI.Modules.Media\HeyAI.Modules.Media.csproj" />
     <ProjectReference Include="..\..\src\HeyAI.Modules.Window\HeyAI.Modules.Window.csproj" />
+    <ProjectReference Include="..\..\src\HeyAI.Server\HeyAI.Server.csproj" />
   </ItemGroup>
 </Project>

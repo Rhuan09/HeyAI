@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using HeyAI.Core;
@@ -11,10 +12,30 @@ namespace HeyAI.Server.Mcp;
 /// STDOUT IS THE WIRE. Nothing but framed JSON-RPC may be written to it, ever. All
 /// diagnostics go to stderr. A stray Console.WriteLine corrupts the stream and the client
 /// disconnects with an unhelpful parse error.
+///
+/// Requests are handled concurrently. The read loop dispatches and moves on, so a slow
+/// tool cannot stall the transport -- including the client's own keepalive ping. JSON-RPC
+/// permits out-of-order responses precisely because each carries its id.
+///
+/// Writes are serialised. Framing is one message per line, so two responses completing at
+/// once would otherwise interleave into a corrupt line.
 /// </summary>
 public sealed class McpServer(ToolRegistry registry, ToolInvoker invoker, TextWriter log)
 {
     private const string ProtocolVersion = "2025-06-18";
+
+    /// <summary>
+    /// A safety valve, not a normal operating point. Reaching it applies backpressure to
+    /// the read loop, which is the lesser evil against unbounded task growth if a client
+    /// floods the transport.
+    /// </summary>
+    private const int MaxConcurrentRequests = 16;
+
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly SemaphoreSlim _concurrency = new(MaxConcurrentRequests, MaxConcurrentRequests);
+
+    /// <summary>In-flight requests by id, so notifications/cancelled can reach them.</summary>
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _inFlight = new();
 
     private string _clientName = "unknown";
 
@@ -29,6 +50,8 @@ public sealed class McpServer(ToolRegistry registry, ToolInvoker invoker, TextWr
     public async Task RunAsync(TextReader input, TextWriter output, CancellationToken ct)
     {
         log.WriteLine($"[heyai] stdio server ready, {registry.All.Count} tools registered");
+
+        var running = new ConcurrentDictionary<Task, byte>();
 
         while (!ct.IsCancellationRequested)
         {
@@ -51,10 +74,58 @@ public sealed class McpServer(ToolRegistry registry, ToolInvoker invoker, TextWr
 
             if (request is null) continue;
 
+            // Cancellation has to be processed on the read loop itself. Queueing it behind
+            // the request it is meant to cancel would make it useless.
+            if (request.Method == "notifications/cancelled")
+            {
+                Cancel(request);
+                continue;
+            }
+
+            await _concurrency.WaitAsync(ct).ConfigureAwait(false);
+
+            var task = DispatchAsync(request, output, ct);
+            running.TryAdd(task, 0);
+            _ = task.ContinueWith(t => running.TryRemove(t, out _), CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
+
+        log.WriteLine("[heyai] stdin closed, draining in-flight requests");
+
+        // Drain rather than abandon: a tool that already changed the machine deserves to
+        // finish writing its audit record.
+        try
+        {
+            await Task.WhenAll(running.Keys).WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            log.WriteLine("[heyai] gave up waiting on in-flight requests");
+        }
+        catch (Exception ex)
+        {
+            // WhenAll surfaces only the first fault, so the rest would go unobserved.
+            // Nothing here is recoverable at shutdown; record it and exit cleanly.
+            log.WriteLine($"[heyai] in-flight request faulted during drain: {ex.Message}");
+        }
+
+        log.WriteLine("[heyai] shutting down");
+    }
+
+    private async Task DispatchAsync(JsonRpcRequest request, TextWriter output, CancellationToken ct)
+    {
+        var id = RequestKey(request);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+        if (id is not null) _inFlight[id] = linked;
+
+        try
+        {
             JsonRpcResponse? response;
             try
             {
-                response = await HandleAsync(request, ct).ConfigureAwait(false);
+                response = await HandleAsync(request, linked.Token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -65,12 +136,48 @@ public sealed class McpServer(ToolRegistry registry, ToolInvoker invoker, TextWr
 
             if (response is not null)
             {
-                await WriteAsync(output, response, ct).ConfigureAwait(false);
+                try
+                {
+                    await WriteAsync(output, response, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // A broken pipe means the client is gone; the read loop will notice.
+                    // Letting this fault the task would surface as an unobserved exception
+                    // during drain instead of an orderly shutdown.
+                    log.WriteLine($"[heyai] could not write response: {ex.Message}");
+                }
             }
         }
-
-        log.WriteLine("[heyai] stdin closed, shutting down");
+        finally
+        {
+            if (id is not null) _inFlight.TryRemove(id, out _);
+            _concurrency.Release();
+        }
     }
+
+    private void Cancel(JsonRpcRequest request)
+    {
+        if (request.Params is not { } prms
+            || !prms.TryGetProperty("requestId", out var target))
+        {
+            return;
+        }
+
+        var key = target.GetRawText();
+        if (_inFlight.TryGetValue(key, out var cts))
+        {
+            log.WriteLine($"[heyai] cancelling request {key}");
+            cts.Cancel();
+        }
+    }
+
+    /// <summary>
+    /// Raw JSON text of the id, so a numeric 1 and a string "1" stay distinct -- the spec
+    /// allows either, and collapsing them would let one request cancel another.
+    /// </summary>
+    private static string? RequestKey(JsonRpcRequest request) =>
+        request.IsNotification ? null : request.Id!.Value.GetRawText();
 
     private async Task<JsonRpcResponse?> HandleAsync(JsonRpcRequest request, CancellationToken ct)
     {
@@ -170,11 +277,23 @@ public sealed class McpServer(ToolRegistry registry, ToolInvoker invoker, TextWr
             """;
     }
 
-    private static async Task WriteAsync(TextWriter output, JsonRpcResponse response, CancellationToken ct)
+    private async Task WriteAsync(TextWriter output, JsonRpcResponse response, CancellationToken ct)
     {
         var json = JsonSerializer.Serialize(response, Options);
-        await output.WriteLineAsync(json.AsMemory(), ct).ConfigureAwait(false);
-        await output.FlushAsync(ct).ConfigureAwait(false);
+
+        // One message per line means a half-written response would corrupt the next one.
+        // CancellationToken.None on the wait: a cancelled request still owes the client a
+        // response, and dropping the lock mid-write would break framing for everyone.
+        await _writeLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+            await output.WriteLineAsync(json.AsMemory(), ct).ConfigureAwait(false);
+            await output.FlushAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
     }
 
     private static string ThisVersion =>
