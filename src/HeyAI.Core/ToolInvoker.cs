@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using HeyAI.Core.Audit;
+using HeyAI.Core.Confirmation;
 using HeyAI.Core.Security;
 using HeyAI.Core.Tools;
 
@@ -17,7 +18,8 @@ public sealed class ToolInvoker(
     ToolRegistry registry,
     IPolicyEngine policy,
     IAuditLog audit,
-    TaintTracker taint)
+    TaintTracker taint,
+    IConfirmationPrompt prompt)
 {
     public async Task<ToolResult> InvokeAsync(
         string toolName, JsonElement args, string? client, CancellationToken ct)
@@ -56,26 +58,59 @@ public sealed class ToolInvoker(
 
         var decision = policy.Evaluate(tool, args, risk);
 
-        if (decision.Outcome != PolicyOutcome.Allow)
+        if (decision.Outcome == PolicyOutcome.Deny)
         {
             audit.Write(new AuditEntry
             {
                 Timestamp = DateTimeOffset.UtcNow,
                 Tool = toolName,
                 Risk = risk,
-                Outcome = decision.Outcome,
+                Outcome = PolicyOutcome.Deny,
                 Reason = decision.Reason,
                 ArgsHash = argsHash,
                 Args = JsonlAuditLog.TruncateArgs(rawArgs),
                 Client = client,
             });
 
-            // RequireConfirmation still cannot reach a human, so it is reported as a
-            // refusal carrying the remedy. The tray exists now, but a server is spawned
-            // per client session while the tray is a separate standing process, so asking
-            // it needs IPC. See docs/ARCHITECTURE.md, "Confirmation transport".
-            var code = decision.Outcome == PolicyOutcome.Deny ? "denied_by_policy" : "confirmation_required";
-            return ToolResult.Error(code, decision.Reason);
+            return ToolResult.Error("denied_by_policy", decision.Reason);
+        }
+
+        bool? confirmedByHuman = null;
+
+        if (decision.Outcome == PolicyOutcome.RequireConfirmation)
+        {
+            // Arguments are truncated before they reach a dialog. They can be long, and
+            // they can contain text an attacker chose -- a window title, a path lifted
+            // from OCR -- so the prompt gets a bounded string to render as inert data.
+            var answer = await prompt.AskAsync(new ConfirmationRequest
+            {
+                ToolName = tool.Name,
+                ToolTitle = tool.Title,
+                Risk = risk,
+                Reason = decision.Reason,
+                ArgumentsJson = JsonlAuditLog.TruncateArgs(rawArgs) ?? "{}",
+                Client = client,
+            }, ct).ConfigureAwait(false);
+
+            confirmedByHuman = answer.Approved;
+
+            audit.Write(new AuditEntry
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                Tool = toolName,
+                Risk = risk,
+                Outcome = PolicyOutcome.RequireConfirmation,
+                Reason = answer.Detail,
+                ArgsHash = argsHash,
+                Args = JsonlAuditLog.TruncateArgs(rawArgs),
+                ConfirmedByHuman = answer.Approved,
+                Client = client,
+            });
+
+            if (!answer.Approved)
+            {
+                return ToolResult.Error("confirmation_denied", answer.Detail);
+            }
         }
 
         var sw = Stopwatch.StartNew();
@@ -115,6 +150,7 @@ public sealed class ToolInvoker(
             Failed = result.IsError,
             ErrorCode = result.ErrorCode,
             ProducedTaintedOutput = result.Tainted,
+            ConfirmedByHuman = confirmedByHuman,
             Client = client,
         });
 

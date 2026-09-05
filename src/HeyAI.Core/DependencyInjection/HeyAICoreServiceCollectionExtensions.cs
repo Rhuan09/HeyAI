@@ -1,5 +1,6 @@
 using HeyAI.Core;
 using HeyAI.Core.Audit;
+using HeyAI.Core.Confirmation;
 using HeyAI.Core.Security;
 using HeyAI.Core.Threading;
 using HeyAI.Core.Tools;
@@ -35,6 +36,11 @@ public static class HeyAICoreServiceCollectionExtensions
         services.TryAddSingleton<IAuditLog>(_ => new JsonlAuditLog());
 
         services.TryAddSingleton<IPolicyEngine, PolicyEngine>();
+
+        // Fail closed by default. A host that forgets to wire a real prompt refuses
+        // Critical actions rather than quietly allowing them; the server replaces this
+        // with the named-pipe prompt that reaches the tray.
+        services.TryAddSingleton<IConfirmationPrompt, DenyingConfirmationPrompt>();
 
         // Resolved lazily, so the STA thread and its message pump only start if something
         // actually needs them. Nothing in the Media module does; Vision will.

@@ -164,14 +164,44 @@ second. GSMTC, Core Audio and free-threaded capture must not use it; see
 
 ## Confirmation transport
 
-`PolicyOutcome.RequireConfirmation` still has no way to reach a human, so `ToolInvoker`
-reports it as a refusal naming the config file. The tray now exists but the two processes
-cannot talk: a server is spawned per client session and the tray is a separate, standing
-process, so this needs IPC — a named pipe the server asks on and the tray answers.
+`PolicyOutcome.RequireConfirmation` reaches a person over a named pipe: the server asks,
+the tray shows a dialog, the answer comes back and the call proceeds or does not.
 
-Until that lands, `Critical` is effectively `Deny`, which is why no `Critical` tool ships
-and why the Shell module is last. MCP's `elicitation` capability is the eventual in-protocol answer, but client support
-is not broad enough to depend on yet.
+A pipe rather than anything else because a server is spawned per client session and has no
+UI, while the tray is one standing process that does. There is no port to collide with,
+nothing reachable from off the machine, and the OS handles the lifetime. The exchange is
+one JSON line each way and then close — a confirmation is a single question, and a
+stateless exchange cannot get out of step.
+
+**Every failure answers "denied".** No tray, a timeout, a broken pipe, a host that forgot
+to register a prompt. If any of those meant "allowed", then killing the tray would be the
+easiest privilege escalation on the machine.
+
+The pipe name carries the user's SID and its ACL admits only that user. The pipe namespace
+is machine-global, and answering someone else's security prompt is precisely what must not
+be possible.
+
+A process running as the same user could still squat the name before the tray starts and
+approve everything. That is not a privilege gain: such a process could already call the
+tools directly or edit `config.json`. It is documented rather than defended against.
+
+### The dialog is a security surface
+
+Three choices there are deliberate:
+
+- Deny is the default, the Escape key, and what closing the window does. The safe answer
+  has to be the one you get by reflex.
+- Allow is disabled for 1.5 seconds after the window appears, so a prompt that pops up
+  mid-click is not approved by a click aimed at something else.
+- Arguments render in a read-only text box, never a label. They can contain text an
+  attacker chose, and newlines in a label could forge lines that look like the dialog's
+  own words.
+
+The audit log records `confirmedByHuman` separately from the policy outcome, because "a
+person said yes" and "the rules said yes" are different claims about the same action.
+
+MCP's `elicitation` capability is the eventual in-protocol answer, but client support is
+not broad enough to depend on yet.
 
 ## Testing
 
@@ -193,7 +223,7 @@ nobody can review a PR for.
 | 1 | Core + Media slice, stdio transport, CLI | done |
 | 2 | `HeyAI.Modules.Window` (User32, UI Automation) | done |
 | 3 | `HeyAI.Modules.Vision` (native OCR + Graphics.Capture) | done |
-| 4 | MSIX packaging + tray app: confirmation prompts, live audit view | packaging and tray done; confirmation transport is the remaining piece |
+| 4 | MSIX packaging + tray app: confirmation prompts, live audit view | done |
 | 5 | `HeyAI.Modules.Shell` | last; it is the dangerous one |
 
 Vision is the moat — `Windows.Media.Ocr` is fast, offline and already installed, against a

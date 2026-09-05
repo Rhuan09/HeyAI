@@ -1,6 +1,7 @@
 using System.Text.Json;
 using HeyAI.Core;
 using HeyAI.Core.Audit;
+using HeyAI.Core.Confirmation;
 using HeyAI.Core.Security;
 using HeyAI.Core.Tools;
 using Microsoft.Extensions.DependencyInjection;
@@ -101,7 +102,7 @@ public sealed class ToolContractTests
     {
         audit = new InMemoryAuditLog();
         var taint = new TaintTracker();
-        return new ToolInvoker(BuildRegistry(), new PolicyEngine(config, taint), audit, taint);
+        return new ToolInvoker(BuildRegistry(), new PolicyEngine(config, taint), audit, taint, new DenyingConfirmationPrompt());
     }
 }
 

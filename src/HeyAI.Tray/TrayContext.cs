@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using HeyAI.Core;
+using HeyAI.Core.Confirmation;
 using HeyAI.Core.Security;
 using HeyAI.Core.Tools;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,14 +17,22 @@ namespace HeyAI.Tray;
 /// The second is giving the permission model a face — the allowlist is a JSON file most
 /// people will never open, and a tool nobody can find is a tool nobody turns on.
 ///
-/// It does NOT yet answer PolicyOutcome.RequireConfirmation. That needs the server to
-/// reach this process, which is the next piece.
+/// It also answers PolicyOutcome.RequireConfirmation for every connected server, over a
+/// per-user named pipe. That is what makes Critical mean something other than Deny.
 /// </summary>
 internal sealed class TrayContext : ApplicationContext
 {
     private readonly NotifyIcon _icon;
     private readonly ToolRegistry _registry;
     private readonly HeyAIConfig _config;
+    private readonly ConfirmationServer _confirmations;
+
+    /// <summary>
+    /// An invisible window used only as a marshalling target. Pipe requests arrive on
+    /// thread-pool threads and a dialog has to be created on the UI thread; NotifyIcon is
+    /// not a Control, so there is nothing else here to Invoke through.
+    /// </summary>
+    private readonly Form _uiThread = new();
 
     public TrayContext()
     {
@@ -53,7 +62,40 @@ internal sealed class TrayContext : ApplicationContext
 
         _icon.DoubleClick += (_, _) => OpenAuditLog();
 
+        // Forces handle creation. Without a handle Invoke throws, and it would throw the
+        // first time a server asked something rather than at startup where it is visible.
+        _ = _uiThread.Handle;
+
+        _confirmations = new ConfirmationServer(AskAsync, message =>
+            _icon.ShowBalloonTip(4000, "HeyAI", message, ToolTipIcon.Warning));
+
         UpdateTooltip();
+    }
+
+    /// <summary>
+    /// Shows the prompt and returns what the person chose. Anything that goes wrong
+    /// answers no: a dialog that fails to appear must not become a way to approve things.
+    /// </summary>
+    private Task<bool> AskAsync(ConfirmationRequest request)
+    {
+        var completion = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _uiThread.BeginInvoke(() =>
+        {
+            try
+            {
+                using var dialog = new ConfirmationDialog(request);
+                dialog.ShowDialog();
+                completion.SetResult(dialog.Approved);
+            }
+            catch (Exception)
+            {
+                completion.SetResult(false);
+            }
+        });
+
+        return completion.Task;
     }
 
     private void BuildMenu()
@@ -173,6 +215,9 @@ internal sealed class TrayContext : ApplicationContext
     {
         if (disposing)
         {
+            _confirmations.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _uiThread.Dispose();
+
             // Without this the icon lingers in the notification area until something else
             // repaints it, which looks like the app failed to close.
             _icon.Visible = false;
