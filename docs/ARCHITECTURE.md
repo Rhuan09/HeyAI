@@ -224,10 +224,16 @@ nobody can review a PR for.
 | 2 | `HeyAI.Modules.Window` (User32, UI Automation) | done |
 | 3 | `HeyAI.Modules.Vision` (native OCR + Graphics.Capture) | done |
 | 4 | MSIX packaging + tray app: confirmation prompts, live audit view | done |
-| 5 | `HeyAI.Modules.Shell` | last; it is the dangerous one |
+| 5 | `HeyAI.Modules.Shell` | done; `shell_open_path` only, and it stays that way |
 
 Vision is the moat — `Windows.Media.Ocr` is fast, offline and already installed, against a
 field of Tesseract wrappers. It ships after Window because it needs the dispatcher and the
 taint plumbing proven first.
 
-Radio toggling and arbitrary PowerShell execution are explicitly **not** on the roadmap.
+Radio toggling and arbitrary command execution are explicitly **not** on the roadmap, and
+`docs/NON-GOALS.md` says why at length. The Shell module exists to open things the shell
+already knows how to open; it will not grow a tool that runs a command string, because
+risk cannot be evaluated from an argument that is itself a program.
+
+The Shell module shipped last for a reason: its one tool is `Critical`, and `Critical` was
+indistinguishable from `Deny` until the confirmation transport existed.
