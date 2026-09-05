@@ -35,6 +35,8 @@ internal static class Program
         {
             [] or ["serve"] => await ServeAsync(provider, log, cts.Token).ConfigureAwait(false),
             ["list"] => ListTools(provider),
+            ["enable", var enableName] => SetToolEnabled(provider, enableName, enabled: true),
+            ["disable", var disableName] => SetToolEnabled(provider, disableName, enabled: false),
             ["test", .. var rest] => await TestToolAsync(provider, rest, log, cts.Token).ConfigureAwait(false),
             ["doctor"] => await DoctorAsync(provider, log).ConfigureAwait(false),
             _ => Usage(),
@@ -73,8 +75,76 @@ internal static class Program
         }
 
         Console.WriteLine();
+        if (registry.All.Any(t => !config.IsEnabled(t.Name)))
+        {
+            // Deny-by-default means an upgrade never turns anything on by itself, so the
+            // way out has to be visible right where the disabled tools are listed.
+            Console.WriteLine("turn one on with: heyai enable <tool_name>");
+            Console.WriteLine();
+        }
+
         Console.WriteLine($"config: {HeyAIPaths.ConfigFile}");
         Console.WriteLine($"audit:  {HeyAIPaths.AuditLogFile}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Adds or removes a tool from the allowlist and writes the config back.
+    ///
+    /// Only reachable from the CLI, never as a tool: an agent that can widen its own
+    /// permissions has no permissions. That is why HeyAIConfig.Save is called from here
+    /// and nowhere else.
+    /// </summary>
+    private static int SetToolEnabled(IServiceProvider provider, string toolName, bool enabled)
+    {
+        var registry = provider.GetRequiredService<ToolRegistry>();
+        var config = provider.GetRequiredService<HeyAIConfig>();
+
+        if (!registry.TryGet(toolName, out _))
+        {
+            Console.Error.WriteLine($"No tool named '{toolName}'.");
+
+            var near = registry.All
+                .Where(t => t.Name.Contains(toolName, StringComparison.OrdinalIgnoreCase)
+                            || toolName.Contains(t.Name.Split('_')[0], StringComparison.OrdinalIgnoreCase))
+                .Select(t => t.Name)
+                .ToList();
+
+            Console.Error.WriteLine(near.Count > 0
+                ? $"Did you mean: {string.Join(", ", near)}"
+                : "Run 'heyai list' to see the registered tools.");
+            return 2;
+        }
+
+        var already = config.IsEnabled(toolName);
+        if (already == enabled)
+        {
+            Console.WriteLine($"'{toolName}' is already {(enabled ? "enabled" : "disabled")}.");
+            return 0;
+        }
+
+        if (enabled)
+        {
+            config.EnabledTools.Add(toolName);
+        }
+        else
+        {
+            // A wildcard entry can enable a tool without naming it, and removing the
+            // exact name would then silently do nothing. Say so rather than lying.
+            var removed = config.EnabledTools.RemoveAll(
+                e => string.Equals(e, toolName, StringComparison.Ordinal)) > 0;
+
+            if (!removed || config.IsEnabled(toolName))
+            {
+                Console.Error.WriteLine(
+                    $"'{toolName}' is enabled by a wildcard entry in {HeyAIPaths.ConfigFile}. " +
+                    "Edit that entry by hand.");
+                return 2;
+            }
+        }
+
+        config.Save();
+        Console.WriteLine($"'{toolName}' {(enabled ? "enabled" : "disabled")}.");
         return 0;
     }
 
@@ -157,6 +227,8 @@ internal static class Program
 
               heyai [serve]              run the MCP server on stdio (default)
               heyai list                 list registered tools and whether they are enabled
+              heyai enable <tool>        allow a tool to run
+              heyai disable <tool>       stop a tool from running
               heyai test <tool> [json]   invoke one tool through the full policy pipeline
               heyai doctor               check the STA dispatcher and state directory
             """);

@@ -55,6 +55,18 @@ public sealed class HeyAIConfig
                ?? Default();
     }
 
+    /// <summary>
+    /// Persists the config. Deliberately not reachable from any tool: the agent must not
+    /// be able to widen its own permissions, so this is only called from the CLI, where a
+    /// human typed the command.
+    /// </summary>
+    public void Save(string? path = null)
+    {
+        path ??= HeyAIPaths.ConfigFile;
+        HeyAIPaths.EnsureCreated();
+        File.WriteAllText(path, JsonSerializer.Serialize(this, WriteOptions));
+    }
+
     public bool IsEnabled(string toolName)
     {
         foreach (var entry in EnabledTools)
