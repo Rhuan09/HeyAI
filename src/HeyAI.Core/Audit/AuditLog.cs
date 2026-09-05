@@ -39,6 +39,9 @@ public interface IAuditLog
 /// Opened with <see cref="FileMode.Append"/> and held for the process lifetime, and the
 /// directory is in <see cref="HeyAIPaths.IsProtected"/> so no shell/filesystem tool can
 /// reach it. Flushed on every write: a crash mid-action must still leave the record.
+///
+/// Several HeyAI processes append to the same file concurrently — a server per connected
+/// client, plus the CLI — so the handle must not exclude other writers.
 /// </summary>
 public sealed class JsonlAuditLog : IAuditLog, IDisposable
 {
@@ -51,8 +54,14 @@ public sealed class JsonlAuditLog : IAuditLog, IDisposable
     {
         path ??= HeyAIPaths.AuditLogFile;
         HeyAIPaths.EnsureCreated();
+        // FileShare.ReadWrite, not Read: the server runs for as long as a client session
+        // does, and the CLI is meant to be used alongside it. Excluding other writers made
+        // `heyai test` fail with a file-in-use error whenever a client was connected.
+        //
+        // Safe because FileMode.Append maps to FILE_APPEND_DATA, where each write seeks to
+        // end atomically, and every entry is flushed as a single line.
         var stream = new FileStream(
-            path, FileMode.Append, FileAccess.Write, FileShare.Read,
+            path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite,
             bufferSize: 4096, FileOptions.WriteThrough);
         _writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true };
     }

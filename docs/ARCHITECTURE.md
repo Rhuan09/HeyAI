@@ -124,7 +124,15 @@ One dedicated STA thread hosting a `DispatcherQueue` created through CoreMessagi
 `CreateDispatcherQueueController`, with a Win32 message loop that *is* the queue drain.
 This is what WinUI sets up for you and what a console host must build by hand.
 
-`Windows.Graphics.Capture` requires it. GSMTC and Core Audio must not use it — see
+**Correction, since this document originally claimed otherwise:**
+`Windows.Graphics.Capture` does *not* require it.
+`Direct3D11CaptureFramePool.CreateFreeThreaded` exists so a host with no UI thread can
+capture, and the Vision module uses it from MTA. Only `GraphicsCapturePicker` needs a
+DispatcherQueue, and a headless server cannot show a picker.
+
+The dispatcher is still the right home for toast activation callbacks, which Phase 4's
+confirmation prompts need — but that is now its first real consumer rather than its
+second. GSMTC, Core Audio and free-threaded capture must not use it; see
 `IWinRtDispatcher`'s remarks and the rule in `CONTRIBUTING.md`.
 
 `heyai doctor` verifies the thread comes up STA before you debug anything else.
@@ -154,8 +162,8 @@ nobody can review a PR for.
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 1 | Core + Media slice, stdio transport, CLI | done |
-| 2 | `HeyAI.Modules.Window` (User32, UI Automation) | next — demoable, low risk |
-| 3 | `HeyAI.Modules.Vision` (native OCR + Graphics.Capture) | the differentiator |
+| 2 | `HeyAI.Modules.Window` (User32, UI Automation) | done |
+| 3 | `HeyAI.Modules.Vision` (native OCR + Graphics.Capture) | `ocr_read_text` done; `screen_capture` pending image content in ToolResult |
 | 4 | MSIX packaging + tray app: confirmation prompts, live audit view | packaging lands here, since identity is what toasts need |
 | 5 | `HeyAI.Modules.Shell` | last; it is the dangerous one |
 

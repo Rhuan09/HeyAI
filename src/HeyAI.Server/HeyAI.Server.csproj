@@ -13,6 +13,7 @@
     <ProjectReference Include="..\HeyAI.Core\HeyAI.Core.csproj" />
     <ProjectReference Include="..\HeyAI.Modules.Media\HeyAI.Modules.Media.csproj" />
     <ProjectReference Include="..\HeyAI.Modules.Window\HeyAI.Modules.Window.csproj" />
+    <ProjectReference Include="..\HeyAI.Modules.Vision\HeyAI.Modules.Vision.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
