@@ -34,6 +34,12 @@ public sealed record ToolAnnotations
     public static ToolAnnotations ReadOnly => new() { ReadOnlyHint = true, IdempotentHint = true };
 }
 
+/// <summary>
+/// A binary image a tool produced. Base64 because that is what MCP's image content block
+/// carries; the client turns it back into pixels for the model.
+/// </summary>
+public sealed record ToolImage(string Base64Data, string MimeType, int Width, int Height);
+
 /// <summary>Result of one tool invocation. Never throws across this boundary.</summary>
 public sealed class ToolResult
 {
@@ -51,6 +57,12 @@ public sealed class ToolResult
 
     public string? TaintSource { get; init; }
 
+    /// <summary>
+    /// Images to attach alongside the text. The transport emits them after the text block,
+    /// so an untrusted-content banner is read before the pixels it describes.
+    /// </summary>
+    public IReadOnlyList<ToolImage> Images { get; init; } = [];
+
     public static ToolResult Ok(string text) => new() { Text = text };
 
     public static ToolResult Json<T>(T value) =>
@@ -63,6 +75,20 @@ public sealed class ToolResult
         Tainted = true,
         TaintSource = source,
     };
+
+    /// <summary>
+    /// An image of something a third party controls -- the screen, a window. Always
+    /// untrusted: a picture of text is still text the model will read, and an injection
+    /// rendered as pixels is not fenced by anything the transport can wrap around bytes.
+    /// </summary>
+    public static ToolResult UntrustedImage<T>(T summary, ToolImage image, string source) =>
+        new()
+        {
+            Text = JsonSerializer.Serialize(summary, HeyAIJson.Options),
+            Tainted = true,
+            TaintSource = source,
+            Images = [image],
+        };
 
     public static ToolResult Error(string code, string message) =>
         new() { Text = message, IsError = true, ErrorCode = code };

@@ -244,11 +244,16 @@ public sealed class McpServer(ToolRegistry registry, ToolInvoker invoker, TextWr
         // A tool error is a successful RPC carrying isError, per the MCP spec: the model
         // is supposed to see it and adapt, not have the client swallow it as a transport
         // failure.
-        return JsonRpcResponse.Ok(request.Id, new
+        // Text first, images after. An untrusted-content banner has to be read before the
+        // pixels it warns about, and there is no way to fence bytes themselves.
+        var content = new List<object> { new { type = "text", text = Render(result) } };
+
+        foreach (var image in result.Images)
         {
-            content = new[] { new { type = "text", text = Render(result) } },
-            isError = result.IsError,
-        });
+            content.Add(new { type = "image", data = image.Base64Data, mimeType = image.MimeType });
+        }
+
+        return JsonRpcResponse.Ok(request.Id, new { content, isError = result.IsError });
     }
 
     /// <summary>

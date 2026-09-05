@@ -13,7 +13,8 @@ underneath it, so you can build your own Jarvis without reimplementing Windows.
 
 ## Status
 
-Phase 1. Media module working end to end; Window and Vision next. See
+Media, Window and Vision working end to end against a real desktop. Next is the tray app,
+which brings MSIX packaging and the confirmation prompts that `Critical` actions need. See
 [the roadmap](docs/ARCHITECTURE.md#roadmap).
 
 ## Install
@@ -35,14 +36,23 @@ claude mcp add heyai -- <repo>/src/HeyAI.Server/bin/Release/net10.0-windows10.0.
 
 ## Tools
 
-| Tool | Risk | What it does |
-| --- | --- | --- |
-| `media_get_status` | read | Active media sessions with track, artist, play state |
-| `media_control` | convenience | play / pause / toggle / next / previous / stop |
-| `audio_get_devices` | read | Output devices and the per-app mixer |
-| `audio_set_volume` | convenience | Master or per-application volume and mute |
+| Tool | Risk | Default | What it does |
+| --- | --- | --- | --- |
+| `media_get_status` | read | on | Active media sessions with track, artist, play state |
+| `media_control` | convenience | on | play / pause / toggle / next / previous / stop |
+| `audio_get_devices` | read | on | Output devices and the per-app mixer |
+| `audio_set_volume` | convenience | on | Master or per-application volume and mute |
+| `window_list_open` | read | on | Open windows with process, focus and minimized state |
+| `window_focus` | convenience | off | Bring a window to the foreground |
+| `window_set_state` | convenience | off | Minimize, maximize or restore a window |
+| `ocr_read_text` | read | off | Read the text on screen, or in one window |
+| `screen_capture` | read | off | Return the screen, or one window, as an image |
 
-New tools ship **disabled**. Enable them in `%LOCALAPPDATA%\HeyAI\config.json`.
+Anything that grabs the screen or reads it ships **disabled**:
+
+```bash
+heyai enable ocr_read_text
+```
 
 ## Try it without an agent
 
@@ -51,6 +61,8 @@ heyai.exe doctor              # check the STA dispatcher and state directory
 heyai.exe list                # registered tools and whether they are enabled
 heyai.exe test media_get_status
 heyai.exe test audio_set_volume '{"target":"app","app":"firefox","level":0.3}'
+heyai.exe test window_list_open
+heyai.exe test ocr_read_text
 ```
 
 `heyai.exe test` runs the full policy and audit pipeline, so what you see is what an agent
