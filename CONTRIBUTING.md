@@ -192,3 +192,5 @@ nobody can review a PR for.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — why the project is shaped this way
 - [docs/SECURITY.md](docs/SECURITY.md) — the threat model; read before enabling anything
   beyond the defaults
+- [docs/NON-GOALS.md](docs/NON-GOALS.md) — what will not be built, and why; read before
+  proposing a tool
