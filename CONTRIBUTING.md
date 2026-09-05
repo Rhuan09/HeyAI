@@ -125,11 +125,16 @@ session, not just the call.
 A console app's main thread is MTA. Calling a DispatcherQueue-affine WinRT API from it
 fails as `RPC_E_WRONG_THREAD` or a silent hang.
 
-- **Must** use `IWinRtDispatcher`: `Windows.Graphics.Capture`, toast activation callbacks,
-  anything XAML or composition.
-- **Must not**: plain COM/Win32 (Core Audio, User32) and GSMTC. They are MTA-safe, and
-  routing them through one pumped thread serialises every call and invites re-entrancy
-  deadlocks. `HeyAI.Modules.Media` bypasses the dispatcher deliberately.
+- **Must** use `IWinRtDispatcher`: toast activation callbacks, anything XAML or
+  composition, and `GraphicsCapturePicker`.
+- **Must not**: plain COM/Win32 (Core Audio, User32), GSMTC, and screen capture through
+  `Direct3D11CaptureFramePool.CreateFreeThreaded`. They are MTA-safe, and routing them
+  through one pumped thread serialises every call and invites re-entrancy deadlocks. The
+  Media and Vision modules bypass the dispatcher deliberately.
+
+`Windows.Graphics.Capture` is the trap here, in both directions. The picker needs a
+DispatcherQueue; the free-threaded frame pool does not, and that is the one a headless
+server uses.
 
 Always `.AsTask(ct)` a WinRT async operation and propagate the `CancellationToken`.
 

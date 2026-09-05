@@ -25,7 +25,8 @@ internal static class Program
         var services = new ServiceCollection()
             .AddHeyAICore()
             .AddHeyAIMedia()
-            .AddHeyAIWindow();
+            .AddHeyAIWindow()
+            .AddHeyAIVision();
 
         // await using: the provider owns disposal of the audit log and, if anything woke
         // it, the dispatcher's STA thread.
