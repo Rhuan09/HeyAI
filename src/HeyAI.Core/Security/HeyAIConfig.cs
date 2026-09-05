@@ -67,6 +67,46 @@ public sealed class HeyAIConfig
         File.WriteAllText(path, JsonSerializer.Serialize(this, WriteOptions));
     }
 
+    /// <summary>
+    /// Outcome of asking for a tool to be turned on or off.
+    ///
+    /// Three cases rather than a bool, because "nothing happened" has two very different
+    /// meanings and collapsing them lets the UI claim success while the tool stays on.
+    /// </summary>
+    public enum ToggleResult
+    {
+        Changed,
+        AlreadyInThatState,
+
+        /// <summary>
+        /// A wildcard entry grants the tool, so removing its exact name achieves nothing.
+        /// Only a human editing that entry can resolve it.
+        /// </summary>
+        BlockedByWildcard,
+    }
+
+    /// <summary>
+    /// Adds or removes a tool from the allowlist. Does not save; the caller decides when
+    /// to persist, and only the CLI and the tray ever do — never a tool.
+    /// </summary>
+    public ToggleResult SetEnabled(string toolName, bool enabled)
+    {
+        if (IsEnabled(toolName) == enabled)
+        {
+            return ToggleResult.AlreadyInThatState;
+        }
+
+        if (enabled)
+        {
+            EnabledTools.Add(toolName);
+            return ToggleResult.Changed;
+        }
+
+        EnabledTools.RemoveAll(e => string.Equals(e, toolName, StringComparison.Ordinal));
+
+        return IsEnabled(toolName) ? ToggleResult.BlockedByWildcard : ToggleResult.Changed;
+    }
+
     public bool IsEnabled(string toolName)
     {
         foreach (var entry in EnabledTools)

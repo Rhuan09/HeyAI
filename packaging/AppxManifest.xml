@@ -55,9 +55,13 @@
 
   <Applications>
     <Application Id="HeyAI" Executable="heyai.exe" EntryPoint="Windows.FullTrustApplication">
+      <!-- AppListEntry="none": the server is spawned by an MCP client, never launched by
+           a person, so a Start menu tile for it would only invite someone to run a process
+           that waits silently on stdin. -->
       <uap:VisualElements
-        DisplayName="HeyAI"
-        Description="Native Windows APIs for AI agents, over MCP."
+        AppListEntry="none"
+        DisplayName="HeyAI Server"
+        Description="MCP server exposing native Windows APIs."
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
         BackgroundColor="transparent">
@@ -74,6 +78,22 @@
           </uap5:AppExecutionAlias>
         </uap5:Extension>
       </Extensions>
+    </Application>
+
+    <!-- The tray is the half a person launches: a standing indicator that something can
+         act on this machine, and where the allowlist gets a face. -->
+    <Application Id="HeyAITray" Executable="heyai-tray.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="HeyAI"
+        Description="Shows what HeyAI is allowed to do, and what it has done."
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        BackgroundColor="transparent">
+        <uap:DefaultTile
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
     </Application>
   </Applications>
 </Package>

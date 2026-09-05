@@ -117,31 +117,17 @@ internal static class Program
             return 2;
         }
 
-        var already = config.IsEnabled(toolName);
-        if (already == enabled)
+        switch (config.SetEnabled(toolName, enabled))
         {
-            Console.WriteLine($"'{toolName}' is already {(enabled ? "enabled" : "disabled")}.");
-            return 0;
-        }
+            case HeyAIConfig.ToggleResult.AlreadyInThatState:
+                Console.WriteLine($"'{toolName}' is already {(enabled ? "enabled" : "disabled")}.");
+                return 0;
 
-        if (enabled)
-        {
-            config.EnabledTools.Add(toolName);
-        }
-        else
-        {
-            // A wildcard entry can enable a tool without naming it, and removing the
-            // exact name would then silently do nothing. Say so rather than lying.
-            var removed = config.EnabledTools.RemoveAll(
-                e => string.Equals(e, toolName, StringComparison.Ordinal)) > 0;
-
-            if (!removed || config.IsEnabled(toolName))
-            {
+            case HeyAIConfig.ToggleResult.BlockedByWildcard:
                 Console.Error.WriteLine(
                     $"'{toolName}' is enabled by a wildcard entry in {HeyAIPaths.ConfigFile}. " +
                     "Edit that entry by hand.");
                 return 2;
-            }
         }
 
         config.Save();
