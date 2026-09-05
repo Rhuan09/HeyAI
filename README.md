@@ -11,6 +11,14 @@ an append-only audit log it cannot reach.
 It is not an assistant. Your assistant is whatever you already use. HeyAI is the layer
 underneath it, so you can build your own Jarvis without reimplementing Windows.
 
+![Claude Code pausing music, opening a folder through a confirmation prompt, and reading the screen with native OCR](docs/demo.gif)
+
+Three things happen there. It **pauses the music** through the system's own media controls.
+It **asks before opening a folder** — `shell_open_path` is `Critical`, so it stops at a
+dialog where Deny is the default and Allow stays disabled for a moment, and nothing runs
+until a person clicks. Then it **reads the screen** with `Windows.Media.Ocr`: offline,
+already installed, a full 1080p screen in well under a second.
+
 ## Status
 
 All five modules working end to end against a real desktop, with MSIX packaging and a
@@ -77,6 +85,17 @@ HeyAI gives a language model tools that read attacker-chosen content *and* tools
 on your machine. That combination is the whole risk, and it is designed against rather
 than hand-waved: untrusted output is marked and fenced, `Critical` actions are refused for
 a window after any untrusted read, and everything — including refusals — is audited.
+
+Here is that design refusing a request, unprompted, during the recording of the demo
+above — the agent had just read the screen, so the `Critical` action that followed was not
+even offered for confirmation:
+
+![HeyAI refusing a Critical action because the session had just read untrusted screen content](docs/security-block.png)
+
+Note the second half of that sentence. The agent then opened the folder with its own
+shell, and it was right to say so: **HeyAI governs HeyAI's tools, not everything its
+client can do.** It is a permission layer, not a sandbox around the agent. If your threat
+model needs the latter, this is not it.
 
 Read [docs/SECURITY.md](docs/SECURITY.md) before enabling anything beyond the defaults. It
 also states what HeyAI does *not* protect against.
