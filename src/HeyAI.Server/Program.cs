@@ -194,7 +194,7 @@ internal static class Program
             : string.Empty)}");
         log.WriteLine(PackageIdentity.IsPackaged
             ? $"identity  : packaged ({PackageIdentity.FullName})"
-            : "identity  : unpackaged (toasts and the tray need MSIX identity)");
+            : "identity  : unpackaged (state is not redirected; nothing here needs identity)");
         log.WriteLine($"config    : {(File.Exists(HeyAIPaths.ConfigFile) ? "present" : "missing")}");
 
         try

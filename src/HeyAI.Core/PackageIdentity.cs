@@ -5,11 +5,14 @@ namespace HeyAI.Core;
 /// <summary>
 /// Whether this process is running with MSIX package identity.
 ///
-/// Identity is not cosmetic: it is what makes `Windows.UI.Notifications` toasts work
-/// without an AUMID + Start Menu shortcut + COM activator, and it is a precondition for
-/// the Phase 4 tray confirmation prompts. Capabilities must degrade on the unpackaged
-/// path rather than throwing, because building from source is the contributor workflow
-/// and will never have identity.
+/// Nothing in HeyAI currently needs identity to work. It would be required for
+/// `Windows.UI.Notifications` toasts, which is why an earlier version of this comment
+/// called it a precondition for the confirmation prompts -- but those were built as a
+/// WinForms dialog, and no toast exists in the project.
+///
+/// What identity does today is change where state lives, silently: see
+/// <see cref="HeyAIPaths.IsRedirected"/>. Reported so that behaviour is visible rather
+/// than mysterious.
 ///
 /// Detection is <c>GetCurrentPackageFullName</c>, which returns APPMODEL_ERROR_NO_PACKAGE
 /// when the process was launched outside a package.

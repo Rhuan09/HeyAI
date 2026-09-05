@@ -54,18 +54,30 @@ rejects any `TargetPlatformIdentifier` (`NETSDK1146`), and the server needs
 project off does not recover it either, because a platform-agnostic project cannot
 reference a windows-TFM one. Global tools are not available to WinRT projects at all.
 
-That left unpackaged-plus-GitHub-Releases against MSIX. MSIX wins because one mechanism
-answers three problems:
+That left unpackaged-plus-GitHub-Releases against MSIX. MSIX was chosen, and one of the
+three reasons given at the time was false — identity was said to gate the confirmation
+prompts, which were then built as a WinForms dialog needing nothing. What survives:
 
 - **Signing.** An unsigned executable that enumerates windows and captures screens trips
   SmartScreen and AV heuristics hard. Store distribution signs for us; the alternative is
   roughly $200/yr for a certificate.
-- **Identity.** Toasts, and therefore the Phase 4 tray confirmation prompts, require it.
-  Without identity that path costs an AUMID, a Start Menu shortcut and a COM activator.
+- **The app execution alias.** It puts `heyai.exe` on PATH, so a client is configured with
+  `claude mcp add heyai -- heyai.exe` instead of a long absolute path into a build folder
+  that breaks on the next `dotnet clean`. This turned out to be the durable reason.
 - **Install.** Store or `winget`, instead of "download a zip and unblock it".
 
-The costs are real: Store review on every release, and a packaging step contributors do
-not need for local work. Hence the unpackaged path stays first-class.
+**Store submission is not currently planned.** It would sign the package for free and
+sidestep SmartScreen, but it costs review latency on every release, and HeyAI's profile —
+`runFullTrust`, screen capture, reading other applications' windows, controlling other
+applications — is exactly what draws extra certification scrutiny. The audience is also
+wrong for it: someone configuring an MCP server in a JSON file is not shopping in the
+Store, and is not deterred by an unsigned build.
+
+MSIX also has a real cost, which is the state redirection described below. Without it,
+that problem would not exist.
+
+So: MSIX for the alias and a clean install, GitHub Releases for people who want to try it
+without a toolchain, and the unpackaged path stays first-class.
 
 ### The assumption that had to be checked
 
@@ -149,16 +161,21 @@ One dedicated STA thread hosting a `DispatcherQueue` created through CoreMessagi
 `CreateDispatcherQueueController`, with a Win32 message loop that *is* the queue drain.
 This is what WinUI sets up for you and what a console host must build by hand.
 
-**Correction, since this document originally claimed otherwise:**
-`Windows.Graphics.Capture` does *not* require it.
+**This section has been wrong twice, so read the current state carefully.**
+
+`Windows.Graphics.Capture` does *not* require the dispatcher.
 `Direct3D11CaptureFramePool.CreateFreeThreaded` exists so a host with no UI thread can
 capture, and the Vision module uses it from MTA. Only `GraphicsCapturePicker` needs a
 DispatcherQueue, and a headless server cannot show a picker.
 
-The dispatcher is still the right home for toast activation callbacks, which Phase 4's
-confirmation prompts need — but that is now its first real consumer rather than its
-second. GSMTC, Core Audio and free-threaded capture must not use it; see
-`IWinRtDispatcher`'s remarks and the rule in `CONTRIBUTING.md`.
+Nor do toasts, because there are none: the confirmation prompt was built as a WinForms
+dialog. **The dispatcher therefore has no consumer at all.** Every module states that it
+does not use it, and the only code resolving it is `heyai doctor`.
+
+It is kept because the rule it embodies is load-bearing even while unexercised — the first
+DispatcherQueue-affine API someone reaches for will fail as a silent hang, and having the
+working implementation is what makes the rule actionable rather than theoretical. Whether
+that justifies ~200 lines of subtle interop is a fair question and an open one.
 
 `heyai doctor` verifies the thread comes up STA before you debug anything else.
 
