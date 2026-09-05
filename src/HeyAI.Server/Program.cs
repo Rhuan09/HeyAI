@@ -123,16 +123,16 @@ internal static class Program
     /// </summary>
     private static int ListWindows(IServiceProvider provider)
     {
-        var windows = provider.GetRequiredService<WindowService>().GetWindows().ToList();
+        var windows = provider.GetRequiredService<WindowService>().GetOpenWindows();
 
         foreach (var w in windows)
         {
-            Console.WriteLine($"0x{w.Hwnd:X8}  {w.Title}");
+            var flags = (w.IsForeground ? "*" : " ") + (w.IsMinimized ? "_" : " ");
+            Console.WriteLine($"{flags} 0x{w.Hwnd:X8}  {w.ProcessName,-16}  {w.Title}");
         }
 
         Console.WriteLine();
         Console.WriteLine($"total: {windows.Count}");
-        Console.WriteLine($"com titulo: {windows.Count(w => w.Title.Length > 0)}");
         return 0;
     }
 
