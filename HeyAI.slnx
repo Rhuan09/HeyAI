@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/HeyAI.Core/HeyAI.Core.csproj" />
     <Project Path="src/HeyAI.Modules.Media/HeyAI.Modules.Media.csproj" />
+    <Project Path="src/HeyAI.Modules.Window/HeyAI.Modules.Window.csproj" />
     <Project Path="src/HeyAI.Server/HeyAI.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">

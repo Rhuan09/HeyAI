@@ -1,11 +1,11 @@
 using System.Text;
 using System.Text.Json;
 using HeyAI.Core;
-using HeyAI.Core.Audit;
 using HeyAI.Core.Security;
 using HeyAI.Core.Threading;
 using HeyAI.Core.Tools;
-using HeyAI.Modules.Media;
+using HeyAI.Modules.Window;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HeyAI.Server;
 
@@ -20,27 +20,31 @@ internal static class Program
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
         HeyAIPaths.EnsureCreated();
-        var config = HeyAIConfig.Load();
-        var taint = new TaintTracker();
-        using var audit = new JsonlAuditLog();
 
-        var registry = new ToolRegistry();
-        registry.RegisterAll(MediaModule.CreateTools());
+        // The composition root. Each module owns its own registrations, so adding one is
+        // a single line here rather than an edit inside this method's body.
+        var services = new ServiceCollection()
+            .AddHeyAICore()
+            .AddHeyAIMedia()
+            .AddHeyAIWindow();
 
-        var invoker = new ToolInvoker(registry, new PolicyEngine(config, taint), audit, taint);
+        // await using: the provider owns disposal of the audit log and, if anything woke
+        // it, the dispatcher's STA thread.
+        await using var provider = services.BuildServiceProvider();
 
         return args switch
         {
-            [] or ["serve"] => await ServeAsync(registry, invoker, log, cts.Token).ConfigureAwait(false),
-            ["list"] => ListTools(registry, config),
-            ["test", .. var rest] => await TestToolAsync(invoker, rest, log, cts.Token).ConfigureAwait(false),
-            ["doctor"] => await DoctorAsync(log).ConfigureAwait(false),
+            [] or ["serve"] => await ServeAsync(provider, log, cts.Token).ConfigureAwait(false),
+            ["list"] => ListTools(provider),
+            ["test", .. var rest] => await TestToolAsync(provider, rest, log, cts.Token).ConfigureAwait(false),
+            ["doctor"] => await DoctorAsync(provider, log).ConfigureAwait(false),
+            ["windows"] => ListWindows(provider),
             _ => Usage(),
         };
     }
 
     private static async Task<int> ServeAsync(
-        ToolRegistry registry, ToolInvoker invoker, TextWriter log, CancellationToken ct)
+        IServiceProvider provider, TextWriter log, CancellationToken ct)
     {
         // No BOM, no autoflush surprises: the client parses raw UTF-8 lines.
         var stdout = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false))
@@ -49,13 +53,20 @@ internal static class Program
         };
         var stdin = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false));
 
-        var server = new Mcp.McpServer(registry, invoker, log);
+        var server = new Mcp.McpServer(
+            provider.GetRequiredService<ToolRegistry>(),
+            provider.GetRequiredService<ToolInvoker>(),
+            log);
+
         await server.RunAsync(stdin, stdout, ct).ConfigureAwait(false);
         return 0;
     }
 
-    private static int ListTools(ToolRegistry registry, HeyAIConfig config)
+    private static int ListTools(IServiceProvider provider)
     {
+        var registry = provider.GetRequiredService<ToolRegistry>();
+        var config = provider.GetRequiredService<HeyAIConfig>();
+
         foreach (var tool in registry.All)
         {
             var state = config.IsEnabled(tool.Name) ? "enabled " : "disabled";
@@ -74,7 +85,7 @@ internal static class Program
     /// loop you want while writing a module: heyai test media_get_status
     /// </summary>
     private static async Task<int> TestToolAsync(
-        ToolInvoker invoker, string[] rest, TextWriter log, CancellationToken ct)
+        IServiceProvider provider, string[] rest, TextWriter log, CancellationToken ct)
     {
         if (rest.Length == 0)
         {
@@ -96,6 +107,7 @@ internal static class Program
             return 2;
         }
 
+        var invoker = provider.GetRequiredService<ToolInvoker>();
         var result = await invoker.InvokeAsync(toolName, args, "heyai-cli", ct).ConfigureAwait(false);
 
         Console.WriteLine(result.Text);
@@ -104,10 +116,31 @@ internal static class Program
     }
 
     /// <summary>
+    /// TEMPORARY scaffolding. Prints raw window enumeration so the shape of the data can
+    /// be seen before window_list_open's schema, risk tier and taint marking are designed.
+    /// Delete this verb once that tool exists — it deliberately bypasses ToolInvoker,
+    /// which is only acceptable because no model can ever reach it.
+    /// </summary>
+    private static int ListWindows(IServiceProvider provider)
+    {
+        var windows = provider.GetRequiredService<WindowService>().GetWindows().ToList();
+
+        foreach (var w in windows)
+        {
+            Console.WriteLine($"0x{w.Hwnd:X8}  {w.Title}");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"total: {windows.Count}");
+        Console.WriteLine($"com titulo: {windows.Count(w => w.Title.Length > 0)}");
+        return 0;
+    }
+
+    /// <summary>
     /// Verifies the environment pieces that fail confusingly at runtime: the STA
     /// DispatcherQueue thread, and write access to the state directory.
     /// </summary>
-    private static async Task<int> DoctorAsync(TextWriter log)
+    private static async Task<int> DoctorAsync(IServiceProvider provider, TextWriter log)
     {
         var ok = true;
 
@@ -117,10 +150,10 @@ internal static class Program
             : "identity  : unpackaged (toasts and the tray need MSIX identity)");
         log.WriteLine($"config    : {(File.Exists(HeyAIPaths.ConfigFile) ? "present" : "missing")}");
 
-        await using var dispatcher = new StaWinRtDispatcher();
         try
         {
-            await dispatcher.WaitForReadyAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            // Resolving this is what starts the STA thread; the container disposes it.
+            var dispatcher = provider.GetRequiredService<IWinRtDispatcher>();
             var apartment = await dispatcher.InvokeAsync(() => Thread.CurrentThread.GetApartmentState());
             log.WriteLine($"dispatcher: ready, apartment={apartment}");
             if (apartment != ApartmentState.STA)
@@ -149,6 +182,7 @@ internal static class Program
               heyai list                 list registered tools and whether they are enabled
               heyai test <tool> [json]   invoke one tool through the full policy pipeline
               heyai doctor               check the STA dispatcher and state directory
+              heyai windows              TEMPORARY: raw window enumeration
             """);
         return 2;
     }
