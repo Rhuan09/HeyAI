@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>HeyAI.Tray</RootNamespace>
+    <AssemblyName>heyai-tray</AssemblyName>
+
+    <!-- WinForms, not WinUI 3. CONTRIBUTING permits Microsoft.WindowsAppSDK in the tray
+         as an exception; it turned out not to be needed. A NotifyIcon with a context menu
+         is exactly what WinForms is for, and it adds no runtime dependency, no
+         bootstrapper and no self-contained deployment constraints. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\heyai.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HeyAI.Core\HeyAI.Core.csproj" />
+    <ProjectReference Include="..\HeyAI.Modules.Media\HeyAI.Modules.Media.csproj" />
+    <ProjectReference Include="..\HeyAI.Modules.Vision\HeyAI.Modules.Vision.csproj" />
+    <ProjectReference Include="..\HeyAI.Modules.Window\HeyAI.Modules.Window.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Assets\heyai.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

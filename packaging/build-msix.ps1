@@ -64,6 +64,17 @@ Write-Host "Publishing $Architecture..." -ForegroundColor Cyan
     /p:Version=$Version
 if ($LASTEXITCODE -ne 0) { throw "publish failed" }
 
+# Into the same folder on purpose. Both are self-contained, so they carry identical
+# runtime files; the second publish overwrites them with the same bytes rather than
+# doubling the package size with a private copy each.
+& dotnet publish (Join-Path $repo 'src/HeyAI.Tray') `
+    --configuration Release `
+    --runtime "win-$Architecture" `
+    --self-contained true `
+    --output $staging `
+    /p:Version=$Version
+if ($LASTEXITCODE -ne 0) { throw "tray publish failed" }
+
 Write-Host 'Staging package files...' -ForegroundColor Cyan
 
 Copy-Item (Join-Path $PSScriptRoot 'Assets') $staging -Recurse -Force
@@ -79,9 +90,19 @@ Set-Content (Join-Path $staging 'AppxManifest.xml') $manifest -Encoding utf8
 Get-ChildItem $staging -Filter *.pdb -Recurse | Remove-Item -Force
 
 if ($Register) {
+    # Re-registering over an existing registration fails with 0x80070490, "Indexed state
+    # handler failed" -- which says nothing about the cause. Removing first is what makes
+    # this usable as a dev loop rather than a one-shot.
+    $existing = Get-AppxPackage -Name 'HeyAI.Server' -ErrorAction SilentlyContinue
+    if ($existing) {
+        Write-Host 'Removing the previous registration...' -ForegroundColor Cyan
+        $existing | Remove-AppxPackage
+    }
+
     Write-Host 'Registering the staged layout (Developer Mode)...' -ForegroundColor Cyan
     Add-AppxPackage -Register (Join-Path $staging 'AppxManifest.xml')
     Write-Host 'Registered. Verify with: heyai doctor' -ForegroundColor Green
+    Write-Host 'The tray is in Start as "HeyAI".' -ForegroundColor Green
     return
 }
 

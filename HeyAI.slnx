@@ -5,6 +5,7 @@
     <Project Path="src/HeyAI.Modules.Vision/HeyAI.Modules.Vision.csproj" />
     <Project Path="src/HeyAI.Modules.Window/HeyAI.Modules.Window.csproj" />
     <Project Path="src/HeyAI.Server/HeyAI.Server.csproj" />
+    <Project Path="src/HeyAI.Tray/HeyAI.Tray.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/HeyAI.Tests/HeyAI.Tests.csproj" />
