@@ -126,7 +126,10 @@ A console app's main thread is MTA. Calling a DispatcherQueue-affine WinRT API f
 fails as `RPC_E_WRONG_THREAD` or a silent hang.
 
 - **Must** use `IWinRtDispatcher`: toast activation callbacks, anything XAML or
-  composition, and `GraphicsCapturePicker`.
+  composition, and `GraphicsCapturePicker`. **Nothing in the project does today** — every
+  module states that it does not, and the only code resolving the dispatcher is
+  `heyai doctor`, which exists to prove it still works. Keep the rule; it is what stops
+  the first such API from being called off an MTA thread and failing as a silent hang.
 - **Must not**: plain COM/Win32 (Core Audio, User32), GSMTC, and screen capture through
   `Direct3D11CaptureFramePool.CreateFreeThreaded`. They are MTA-safe, and routing them
   through one pumped thread serialises every call and invites re-entrancy deadlocks. The
