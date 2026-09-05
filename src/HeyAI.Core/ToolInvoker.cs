@@ -70,9 +70,10 @@ public sealed class ToolInvoker(
                 Client = client,
             });
 
-            // Phase 1 has no tray, so RequireConfirmation cannot be satisfied and is
-            // reported as a refusal with the remedy. Phase 3 replaces this branch with a
-            // real prompt (see docs/ARCHITECTURE.md, "Confirmation transport").
+            // RequireConfirmation still cannot reach a human, so it is reported as a
+            // refusal carrying the remedy. The tray exists now, but a server is spawned
+            // per client session while the tray is a separate standing process, so asking
+            // it needs IPC. See docs/ARCHITECTURE.md, "Confirmation transport".
             var code = decision.Outcome == PolicyOutcome.Deny ? "denied_by_policy" : "confirmation_required";
             return ToolResult.Error(code, decision.Reason);
         }

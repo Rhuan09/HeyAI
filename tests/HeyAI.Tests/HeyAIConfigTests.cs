@@ -61,3 +61,62 @@ public sealed class HeyAIConfigTests : IDisposable
         if (File.Exists(_path)) File.Delete(_path);
     }
 }
+
+/// <summary>
+/// The allowlist toggle, shared by `heyai enable` and the tray menu. Three outcomes rather
+/// than a bool, because "nothing changed" has two meanings and collapsing them would let a
+/// UI report success while the tool stays on.
+/// </summary>
+public sealed class ToolToggleTests
+{
+    [Fact]
+    public void Enabling_a_disabled_tool_changes_it()
+    {
+        var config = new HeyAIConfig { EnabledTools = [] };
+
+        Assert.Equal(HeyAIConfig.ToggleResult.Changed, config.SetEnabled("media_control", true));
+        Assert.True(config.IsEnabled("media_control"));
+    }
+
+    [Fact]
+    public void Disabling_an_enabled_tool_changes_it()
+    {
+        var config = new HeyAIConfig { EnabledTools = ["media_control"] };
+
+        Assert.Equal(HeyAIConfig.ToggleResult.Changed, config.SetEnabled("media_control", false));
+        Assert.False(config.IsEnabled("media_control"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Asking_for_the_state_it_is_already_in_reports_so(bool enabled)
+    {
+        var config = new HeyAIConfig { EnabledTools = enabled ? ["media_control"] : [] };
+
+        Assert.Equal(
+            HeyAIConfig.ToggleResult.AlreadyInThatState,
+            config.SetEnabled("media_control", enabled));
+    }
+
+    [Fact]
+    public void Disabling_a_tool_granted_by_a_wildcard_reports_that_rather_than_lying()
+    {
+        var config = new HeyAIConfig { EnabledTools = ["media_*"] };
+
+        var result = config.SetEnabled("media_control", false);
+
+        Assert.Equal(HeyAIConfig.ToggleResult.BlockedByWildcard, result);
+        Assert.True(config.IsEnabled("media_control"));
+    }
+
+    [Fact]
+    public void Disabling_removes_only_the_exact_entry()
+    {
+        var config = new HeyAIConfig { EnabledTools = ["media_control", "media_get_status"] };
+
+        config.SetEnabled("media_control", false);
+
+        Assert.Equal(["media_get_status"], config.EnabledTools);
+    }
+}

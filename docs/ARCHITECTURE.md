@@ -164,10 +164,14 @@ second. GSMTC, Core Audio and free-threaded capture must not use it; see
 
 ## Confirmation transport
 
-`PolicyOutcome.RequireConfirmation` has no way to reach a human in Phase 1, so
-`ToolInvoker` reports it as a refusal naming the config file. Phase 3 replaces that branch
-with a tray prompt. MCP's `elicitation` capability is the eventual in-protocol answer, but
-client support is not broad enough to depend on yet.
+`PolicyOutcome.RequireConfirmation` still has no way to reach a human, so `ToolInvoker`
+reports it as a refusal naming the config file. The tray now exists but the two processes
+cannot talk: a server is spawned per client session and the tray is a separate, standing
+process, so this needs IPC — a named pipe the server asks on and the tray answers.
+
+Until that lands, `Critical` is effectively `Deny`, which is why no `Critical` tool ships
+and why the Shell module is last. MCP's `elicitation` capability is the eventual in-protocol answer, but client support
+is not broad enough to depend on yet.
 
 ## Testing
 
@@ -188,8 +192,8 @@ nobody can review a PR for.
 | --- | --- | --- |
 | 1 | Core + Media slice, stdio transport, CLI | done |
 | 2 | `HeyAI.Modules.Window` (User32, UI Automation) | done |
-| 3 | `HeyAI.Modules.Vision` (native OCR + Graphics.Capture) | `ocr_read_text` done; `screen_capture` pending image content in ToolResult |
-| 4 | MSIX packaging + tray app: confirmation prompts, live audit view | packaging lands here, since identity is what toasts need |
+| 3 | `HeyAI.Modules.Vision` (native OCR + Graphics.Capture) | done |
+| 4 | MSIX packaging + tray app: confirmation prompts, live audit view | packaging and tray done; confirmation transport is the remaining piece |
 | 5 | `HeyAI.Modules.Shell` | last; it is the dangerous one |
 
 Vision is the moat — `Windows.Media.Ocr` is fast, offline and already installed, against a
