@@ -4,7 +4,6 @@ using HeyAI.Core;
 using HeyAI.Core.Security;
 using HeyAI.Core.Threading;
 using HeyAI.Core.Tools;
-using HeyAI.Modules.Window;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HeyAI.Server;
@@ -38,7 +37,6 @@ internal static class Program
             ["list"] => ListTools(provider),
             ["test", .. var rest] => await TestToolAsync(provider, rest, log, cts.Token).ConfigureAwait(false),
             ["doctor"] => await DoctorAsync(provider, log).ConfigureAwait(false),
-            ["windows"] => ListWindows(provider),
             _ => Usage(),
         };
     }
@@ -116,27 +114,6 @@ internal static class Program
     }
 
     /// <summary>
-    /// TEMPORARY scaffolding. Prints raw window enumeration so the shape of the data can
-    /// be seen before window_list_open's schema, risk tier and taint marking are designed.
-    /// Delete this verb once that tool exists — it deliberately bypasses ToolInvoker,
-    /// which is only acceptable because no model can ever reach it.
-    /// </summary>
-    private static int ListWindows(IServiceProvider provider)
-    {
-        var windows = provider.GetRequiredService<WindowService>().GetWindows().ToList();
-
-        foreach (var w in windows)
-        {
-            Console.WriteLine($"0x{w.Hwnd:X8}  {w.Title}");
-        }
-
-        Console.WriteLine();
-        Console.WriteLine($"total: {windows.Count}");
-        Console.WriteLine($"com titulo: {windows.Count(w => w.Title.Length > 0)}");
-        return 0;
-    }
-
-    /// <summary>
     /// Verifies the environment pieces that fail confusingly at runtime: the STA
     /// DispatcherQueue thread, and write access to the state directory.
     /// </summary>
@@ -182,7 +159,6 @@ internal static class Program
               heyai list                 list registered tools and whether they are enabled
               heyai test <tool> [json]   invoke one tool through the full policy pipeline
               heyai doctor               check the STA dispatcher and state directory
-              heyai windows              TEMPORARY: raw window enumeration
             """);
         return 2;
     }
