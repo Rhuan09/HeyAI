@@ -3,7 +3,7 @@ using HeyAI.Core;
 using HeyAI.Core.Audit;
 using HeyAI.Core.Security;
 using HeyAI.Core.Tools;
-using HeyAI.Modules.Media;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace HeyAI.Tests;
@@ -14,11 +14,19 @@ namespace HeyAI.Tests;
 /// </summary>
 public sealed class ToolContractTests
 {
+    /// <summary>
+    /// Builds the registry the way the real host does, through the container, so these
+    /// contract tests break if a module forgets to register a tool.
+    /// </summary>
     private static ToolRegistry BuildRegistry()
     {
-        var registry = new ToolRegistry();
-        registry.RegisterAll(MediaModule.CreateTools());
-        return registry;
+        var provider = new ServiceCollection()
+            .AddHeyAICore(HeyAIConfig.Default())
+            .AddHeyAIMedia()
+            .AddHeyAIWindow()
+            .BuildServiceProvider();
+
+        return provider.GetRequiredService<ToolRegistry>();
     }
 
     [Fact]

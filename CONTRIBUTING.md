@@ -87,6 +87,20 @@ Never call `IHeyAITool.ExecuteAsync` directly. `ToolInvoker` is where risk evalu
 policy, taint tracking and audit happen; a second entry point bypasses the entire security
 model. There is exactly one path on purpose.
 
+The container makes every tool resolvable, which puts that bypass within easy reach:
+nothing outside `Program` may resolve `IHeyAITool` and invoke it. Resolve `ToolInvoker`
+instead.
+
+### Composition lives in `AddHeyAI*` extensions
+
+Each module registers its own services and tools; the Server chains the calls and owns
+the only `BuildServiceProvider`. Everything is a singleton — one process per client
+session, no concurrent users, so scoped and transient have nothing to express.
+
+Modules reference `Microsoft.Extensions.DependencyInjection.Abstractions` only. The full
+container package stays at the composition root, for the same reason `Core` knows no
+module.
+
 ### `ExecuteAsync` does not throw
 
 Operational failures are `ToolResult.Error(code, message)` with a code the model can
@@ -139,7 +153,10 @@ audit log the agent can open is an audit log the agent can erase.
 5. If output contains anything a third party chooses — screen pixels, OCR text, window
    titles, track metadata, device names — return `ToolResult.UntrustedJson(value, source)`.
    That is what arms the read-then-execute block in `docs/SECURITY.md`.
-6. Register it in the module's `CreateTools()`.
+6. Register it in the module's `AddHeyAI*` extension, with
+   `TryAddEnumerable(ServiceDescriptor.Singleton<IHeyAITool, YourTool>())`. Plain
+   `AddSingleton` would register the tool twice if the extension is ever called twice,
+   and `ToolRegistry` throws on duplicate names.
 7. Ship it **disabled**. Only add to `HeyAIConfig.Default()` if it is read-only or
    trivially reversible.
 

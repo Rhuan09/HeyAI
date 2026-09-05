@@ -9,6 +9,16 @@ public sealed class ToolRegistry
 {
     private readonly Dictionary<string, IHeyAITool> _tools = new(StringComparer.Ordinal);
 
+    public ToolRegistry()
+    {
+    }
+
+    /// <summary>
+    /// DI entry point: every module registers its tools as <see cref="IHeyAITool"/>, and
+    /// the container hands the whole set here. Modules no longer expose a CreateTools().
+    /// </summary>
+    public ToolRegistry(IEnumerable<IHeyAITool> tools) => RegisterAll(tools);
+
     public void Register(IHeyAITool tool)
     {
         if (!_tools.TryAdd(tool.Name, tool))
