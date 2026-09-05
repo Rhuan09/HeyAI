@@ -192,7 +192,9 @@ internal static class Program
     {
         var ok = true;
 
-        log.WriteLine($"state dir : {HeyAIPaths.Root}");
+        log.WriteLine($"state dir : {HeyAIPaths.Root}{(HeyAIPaths.IsRedirected
+            ? "  (redirected into this package's container by MSIX -- not shared with an unpackaged install)"
+            : string.Empty)}");
         log.WriteLine(PackageIdentity.IsPackaged
             ? $"identity  : packaged ({PackageIdentity.FullName})"
             : "identity  : unpackaged (toasts and the tray need MSIX identity)");

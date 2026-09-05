@@ -90,6 +90,31 @@ PowerShell or cmd, or the result is meaningless.
 
 `heyai doctor` reports identity, so this stays observable rather than becoming folklore.
 
+## State and packaging
+
+**A packaged install and an unpackaged one do not share state.**
+
+MSIX applies file system redirection to AppData transparently. Both builds compute the
+same path, both report `config: present`, `File.Exists` agrees with both — and the bytes
+land in different files. Verified by enabling a tool in one build and watching the other
+still report it disabled.
+
+Two consequences worth stating plainly:
+
+- Installing the package does not carry over an existing allowlist. Deny-by-default makes
+  that safe rather than dangerous, but it is surprising: tools appear to have switched
+  themselves off.
+- There are then **two audit logs**. `docs/SECURITY.md` claims a complete record of what
+  an agent did; with both builds in use that record is split, and neither half says so.
+
+`heyai doctor` reports the redirection rather than the bare path, because a path that is
+not where the bytes are is worse than no path at all. The deeper fix — an explicit
+per-package location, and migrating an existing config on first packaged run — is not done
+yet.
+
+Nothing in the code can undo the redirection; the Package Support Framework exists for
+exactly this and is heavier than the problem currently justifies.
+
 ## Layout
 
 ```

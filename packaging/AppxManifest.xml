@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest for HeyAI.
+
+  Two things here are load-bearing rather than boilerplate:
+
+  * EntryPoint="Windows.FullTrustApplication" plus rescap:runFullTrust. HeyAI is a desktop
+    console process, not a UWP app; without these it cannot call user32, Core Audio or
+    Direct3D at all.
+
+  * The appExecutionAlias. It is what puts `heyai.exe` on PATH so an MCP client can spawn
+    the server by name, and it is also what gives the process package identity — which is
+    what toast notifications need for the Phase 4 confirmation prompts.
+
+  Verified before committing to MSIX: stdin/stdout pipes survive the alias shim, the
+  process reports package identity through it, and the STA dispatcher still comes up.
+  See docs/ARCHITECTURE.md, "Distribution".
+
+  Version is rewritten by packaging/build-msix.ps1; the value here is a placeholder.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap5 rescap">
+
+  <Identity
+    Name="HeyAI.Server"
+    Publisher="CN=HeyAI"
+    Version="0.1.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>HeyAI</DisplayName>
+    <PublisherDisplayName>HeyAI</PublisherDisplayName>
+    <Description>Native Windows APIs for AI agents, over MCP.</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.19041.0"
+      MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="HeyAI" Executable="heyai.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="HeyAI"
+        Description="Native Windows APIs for AI agents, over MCP."
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        BackgroundColor="transparent">
+        <uap:DefaultTile
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <uap5:Extension Category="windows.appExecutionAlias">
+          <uap5:AppExecutionAlias>
+            <uap5:ExecutionAlias Alias="heyai.exe" />
+          </uap5:AppExecutionAlias>
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

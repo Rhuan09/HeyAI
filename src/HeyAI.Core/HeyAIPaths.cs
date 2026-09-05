@@ -6,6 +6,20 @@ namespace HeyAI.Core;
 /// </summary>
 public static class HeyAIPaths
 {
+    /// <summary>
+    /// True when the OS is silently redirecting this process's writes under these paths.
+    ///
+    /// MSIX applies file system redirection to AppData, transparently: the app computes
+    /// and reports the normal path, File.Exists agrees, and the bytes actually land in a
+    /// per-package container. A packaged and an unpackaged install therefore have
+    /// different config and different audit logs while both claiming the same location.
+    ///
+    /// Verified by enabling a tool in one and watching the other still report it disabled.
+    /// Nothing here can undo the redirection; the point is to stop reporting a path that
+    /// is not where the bytes are. See docs/ARCHITECTURE.md, "State and packaging".
+    /// </summary>
+    public static bool IsRedirected => PackageIdentity.IsPackaged;
+
     public static string Root { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HeyAI");
 
