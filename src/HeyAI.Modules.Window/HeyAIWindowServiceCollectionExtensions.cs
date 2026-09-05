@@ -19,6 +19,8 @@ public static class HeyAIWindowServiceCollectionExtensions
         services.TryAddEnumerable(
         [
             ServiceDescriptor.Singleton<IHeyAITool, WindowListOpenTool>(),
+            ServiceDescriptor.Singleton<IHeyAITool, WindowFocusTool>(),
+            ServiceDescriptor.Singleton<IHeyAITool, WindowSetStateTool>(),
         ]);
 
         return services;

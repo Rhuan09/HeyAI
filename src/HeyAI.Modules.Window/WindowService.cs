@@ -20,6 +20,19 @@ public sealed record WindowInfo
     public required bool IsMinimized { get; init; }
 }
 
+/// <summary>What a window can be asked to become.</summary>
+public enum WindowStateChange
+{
+    Minimize,
+    Maximize,
+    Restore,
+}
+
+/// <summary>
+/// Result of an action that the OS may refuse without saying so.
+/// </summary>
+public sealed record WindowActionOutcome(bool Succeeded, string Detail);
+
 /// <summary>
 /// Win32 window enumeration, filtered to what a person means by "my open windows".
 ///
@@ -57,6 +70,119 @@ public sealed class WindowService
     /// popup rather than a flat owner check. Suspect it first if a window goes missing.
     /// </summary>
     public IReadOnlyList<WindowInfo> GetOpenWindows() => Enumerate(IsUserFacing);
+
+    /// <summary>
+    /// Resolves a handle the model supplied to a window that exists right now.
+    ///
+    /// Windows recycles handles, so one held across turns can name a different window --
+    /// or none. Every action re-resolves through the live list rather than trusting the
+    /// number, which closes that gap: a recycled handle either is not user-facing or
+    /// comes back with a process and title the caller can see changed.
+    /// </summary>
+    public WindowInfo? FindByHandle(long handle) =>
+        GetOpenWindows().FirstOrDefault(w => w.Hwnd == handle);
+
+    /// <summary>Case-insensitive substring over title and process name.</summary>
+    public IReadOnlyList<WindowInfo> FindByFilter(string filter) =>
+        GetOpenWindows()
+            .Where(w => w.Title.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                        || w.ProcessName.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+    /// <summary>
+    /// Brings a window to the foreground, and reports honestly whether it worked.
+    ///
+    /// SetForegroundWindow returns true far more often than it moves focus. Windows'
+    /// foreground lock blocks any process that is not already foreground -- which a
+    /// background MCP server never is -- and the call then just flashes the taskbar
+    /// button while reporting success.
+    ///
+    /// The way through is AttachThreadInput: joining our input queue to the current
+    /// foreground window's thread makes the OS treat us as part of that input context.
+    /// It is the long-standing workaround, not a guarantee, so the result is verified
+    /// against GetForegroundWindow rather than against the return value.
+    /// </summary>
+    public WindowActionOutcome Focus(long handle)
+    {
+        var hwnd = new IntPtr(handle);
+        if (!NativeMethods.IsWindow(hwnd))
+        {
+            return new WindowActionOutcome(false, "that window no longer exists");
+        }
+
+        // A minimized window cannot take focus. Restore first, or the foreground call
+        // succeeds against a window nobody can see.
+        if (NativeMethods.IsIconic(hwnd))
+        {
+            NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE);
+        }
+
+        var foreground = NativeMethods.GetForegroundWindow();
+        if (foreground == hwnd)
+        {
+            return new WindowActionOutcome(true, "already in the foreground");
+        }
+
+        var ourThread = NativeMethods.GetCurrentThreadId();
+        var foregroundThread = foreground == IntPtr.Zero
+            ? 0
+            : NativeMethods.GetWindowThreadProcessId(foreground, out _);
+
+        var attached = foregroundThread != 0
+                       && foregroundThread != ourThread
+                       && NativeMethods.AttachThreadInput(ourThread, foregroundThread, true);
+
+        try
+        {
+            NativeMethods.BringWindowToTop(hwnd);
+            NativeMethods.SetForegroundWindow(hwnd);
+        }
+        finally
+        {
+            // Leaving input queues attached would couple this process to another app's
+            // input for the rest of its life. Detach even if the call above threw.
+            if (attached)
+            {
+                NativeMethods.AttachThreadInput(ourThread, foregroundThread, false);
+            }
+        }
+
+        return NativeMethods.GetForegroundWindow() == hwnd
+            ? new WindowActionOutcome(true, "focused")
+            : new WindowActionOutcome(false,
+                "the OS foreground lock refused the change; the window's taskbar button " +
+                "is probably flashing instead");
+    }
+
+    /// <summary>
+    /// Minimizes, maximizes or restores. ShowWindow's return value reports the window's
+    /// previous visibility, not success, so the new state is read back instead.
+    /// </summary>
+    public WindowActionOutcome SetState(long handle, WindowStateChange change)
+    {
+        var hwnd = new IntPtr(handle);
+        if (!NativeMethods.IsWindow(hwnd))
+        {
+            return new WindowActionOutcome(false, "that window no longer exists");
+        }
+
+        var command = change switch
+        {
+            WindowStateChange.Minimize => NativeMethods.SW_MINIMIZE,
+            WindowStateChange.Maximize => NativeMethods.SW_MAXIMIZE,
+            WindowStateChange.Restore => NativeMethods.SW_RESTORE,
+            _ => NativeMethods.SW_RESTORE,
+        };
+
+        NativeMethods.ShowWindow(hwnd, command);
+
+        var minimized = NativeMethods.IsIconic(hwnd);
+        var expectedMinimized = change == WindowStateChange.Minimize;
+
+        return minimized == expectedMinimized
+            ? new WindowActionOutcome(true, change.ToString().ToLowerInvariant() + "d")
+            : new WindowActionOutcome(false, $"the window did not accept {change}");
+    }
 
     private static bool IsUserFacing(IntPtr hwnd)
     {

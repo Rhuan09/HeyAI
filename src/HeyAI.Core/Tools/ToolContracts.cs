@@ -66,6 +66,24 @@ public sealed class ToolResult
 
     public static ToolResult Error(string code, string message) =>
         new() { Text = message, IsError = true, ErrorCode = code };
+
+    /// <summary>
+    /// An error whose message embeds attacker-influenceable text — a list of window
+    /// titles to disambiguate, say.
+    ///
+    /// Easy to miss: fencing only the success path leaves error messages as an unfenced
+    /// channel into the model's context, and an error is a particularly good place to
+    /// hide an injection because it is where the model is told what to do next.
+    /// </summary>
+    public static ToolResult UntrustedError(string code, string message, string source) =>
+        new()
+        {
+            Text = message,
+            IsError = true,
+            ErrorCode = code,
+            Tainted = true,
+            TaintSource = source,
+        };
 }
 
 /// <summary>Every HeyAI capability exposed to an agent implements this.</summary>

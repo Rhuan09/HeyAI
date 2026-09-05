@@ -9,6 +9,10 @@ internal static partial class NativeMethods
     internal const long WS_EX_TOOLWINDOW = 0x00000080;
     internal const int DWMWA_CLOAKED = 14;
 
+    internal const int SW_MAXIMIZE = 3;
+    internal const int SW_MINIMIZE = 6;
+    internal const int SW_RESTORE = 9;
+
     /// <summary>
     /// EnumWindows hands the OS a function pointer and calls it once per window, so this
     /// is the one place the CONTRIBUTING rule "LibraryImport, not DllImport" is broken:
@@ -52,6 +56,40 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     internal static partial uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsWindow(IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool ShowWindow(IntPtr hWnd, int command);
+
+    /// <summary>
+    /// Returns true far more often than it actually moves focus. Windows' foreground lock
+    /// blocks a process that is not already foreground, and the call then merely flashes
+    /// the taskbar button while reporting success. Never trust the return value — verify
+    /// with GetForegroundWindow afterwards.
+    /// </summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetForegroundWindow(IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool BringWindowToTop(IntPtr hWnd);
+
+    /// <summary>
+    /// Joins two threads' input queues. Attaching to the current foreground window's
+    /// thread makes the OS treat us as part of that input context, which is what lets
+    /// SetForegroundWindow through the foreground lock. Must always be detached again.
+    /// </summary>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool AttachThreadInput(uint attachTo, uint attachFrom, [MarshalAs(UnmanagedType.Bool)] bool attach);
+
+    [LibraryImport("kernel32.dll")]
+    internal static partial uint GetCurrentThreadId();
 
     /// <summary>
     /// Not user32 — the Desktop Window Manager owns cloaking. Returns an HRESULT, and
