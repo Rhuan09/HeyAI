@@ -13,9 +13,11 @@ underneath it, so you can build your own Jarvis without reimplementing Windows.
 
 ## Status
 
-Media, Window and Vision working end to end against a real desktop. Next is the tray app,
-which brings MSIX packaging and the confirmation prompts that `Critical` actions need. See
-[the roadmap](docs/ARCHITECTURE.md#roadmap).
+All five modules working end to end against a real desktop, with MSIX packaging and a
+tray that answers confirmation prompts. See [the roadmap](docs/ARCHITECTURE.md#roadmap).
+
+`Critical` actions — currently only `shell_open_path` in open mode — are never approved
+automatically. They stop at a dialog, and if the tray is not running they are refused.
 
 ## Install
 
@@ -47,8 +49,9 @@ claude mcp add heyai -- <repo>/src/HeyAI.Server/bin/Release/net10.0-windows10.0.
 | `window_set_state` | convenience | off | Minimize, maximize or restore a window |
 | `ocr_read_text` | read | off | Read the text on screen, or in one window |
 | `screen_capture` | read | off | Return the screen, or one window, as an image |
+| `shell_open_path` | **critical** | off | Open a file or folder, or reveal it in Explorer |
 
-Anything that grabs the screen or reads it ships **disabled**:
+Anything that reads the screen or starts a program ships **disabled**:
 
 ```bash
 heyai enable ocr_read_text

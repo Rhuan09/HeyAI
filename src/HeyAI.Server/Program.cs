@@ -36,7 +36,8 @@ internal static class Program
             .AddHeyAICore()
             .AddHeyAIMedia()
             .AddHeyAIWindow()
-            .AddHeyAIVision();
+            .AddHeyAIVision()
+            .AddHeyAIShell();
 
         // await using: the provider owns disposal of the audit log and, if anything woke
         // it, the dispatcher's STA thread.

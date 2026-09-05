@@ -43,6 +43,7 @@ internal sealed class TrayContext : ApplicationContext
             .AddHeyAIMedia()
             .AddHeyAIWindow()
             .AddHeyAIVision()
+            .AddHeyAIShell()
             .BuildServiceProvider();
 
         _registry = provider.GetRequiredService<ToolRegistry>();
