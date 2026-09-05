@@ -80,7 +80,11 @@ also states what HeyAI does *not* protect against.
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for the branching model, the PR checklist, and
+Read [docs/NON-GOALS.md](docs/NON-GOALS.md) before proposing a tool — several categories
+are closed by design, and the reasoning there answers most proposals faster than a thread
+will.
+
+Then [CONTRIBUTING.md](CONTRIBUTING.md) for the branching model, the PR checklist, and
 the rules that are not negotiable. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains
 why things are shaped the way they are.
 
@@ -95,4 +99,4 @@ session — so desktop-gated tests are on you before opening a PR.
 
 ## Licence
 
-Apache-2.0.
+[Apache-2.0](LICENSE).
