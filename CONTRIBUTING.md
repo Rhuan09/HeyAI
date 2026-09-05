@@ -67,6 +67,7 @@ A PR is ready when:
 - [ ] No new NuGet dependency without justification in the description
 - [ ] `Microsoft.WindowsAppSDK` was not added to anything under `src/`
 - [ ] New tools ship disabled, and untrusted output is marked
+- [ ] Anything with shared mutable state is safe to call concurrently with itself
 
 Security-relevant changes — anything touching `Security/`, `Audit/`, `ToolInvoker`, or a
 tool's `EvaluateRisk` — need a second reviewer and an explicit note on what the change
@@ -100,6 +101,18 @@ session, no concurrent users, so scoped and transient have nothing to express.
 Modules reference `Microsoft.Extensions.DependencyInjection.Abstractions` only. The full
 container package stays at the composition root, for the same reason `Core` knows no
 module.
+
+### A tool may be called concurrently with itself
+
+The transport dispatches requests in parallel, so two calls to the same tool can overlap,
+and a tool's own services can be re-entered before an earlier call returns.
+
+Prefer building fresh OS objects per call, as the Media, Audio and Window services do —
+an enumerator or session manager created inside the method needs no synchronisation. If a
+tool must hold state across calls, it owns the locking; nothing above it provides any.
+
+`IWinRtDispatcher` serialises everything routed through it, which is a property to rely on
+for capture work rather than a reason to route MTA-safe calls there.
 
 ### `ExecuteAsync` does not throw
 
